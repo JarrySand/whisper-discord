@@ -53,9 +53,9 @@ export const botConfig: BotConfig = {
   audio: {
     sampleRate: 48000,
     channels: 2,
-    silenceThreshold: getEnvNumberOrDefault('AUDIO_SILENCE_THRESHOLD', 1500),
-    maxSegmentDuration: getEnvNumberOrDefault('AUDIO_MAX_SEGMENT_DURATION', 30000),
-    minSegmentDuration: getEnvNumberOrDefault('AUDIO_MIN_SEGMENT_DURATION', 500),
+    silenceThreshold: getEnvNumberOrDefault('AUDIO_SILENCE_THRESHOLD', 2000),  // 2秒沈黙で区切り
+    maxSegmentDuration: getEnvNumberOrDefault('AUDIO_MAX_SEGMENT_DURATION', 60000),  // 60秒セグメント（レート制限対策）
+    minSegmentDuration: getEnvNumberOrDefault('AUDIO_MIN_SEGMENT_DURATION', 1000),
     minRmsThreshold: parseFloat(process.env['AUDIO_MIN_RMS_THRESHOLD'] ?? '0.01'),  // 低エネルギーセグメント除去（コスト削減・ハルシネーション防止）
   },
 

@@ -26,6 +26,10 @@ export class TranscriptionQueue extends EventEmitter {
   private whisperClient: WhisperClient;
   private circuitBreaker: CircuitBreaker | null;
   private isRunning = false;
+  
+  // レート制限対策: 最後のリクエスト時刻
+  private lastRequestTime = 0;
+  private readonly minRequestInterval = 3500; // 3.5秒間隔 (20リクエスト/分以下)
 
   constructor(
     whisperClient: WhisperClient,
@@ -111,6 +115,16 @@ export class TranscriptionQueue extends EventEmitter {
 
     const item = this.queue.shift()!;
     this.processing.set(item.id, item);
+
+    // レート制限対策: 前回リクエストから最低間隔を待つ
+    const now = Date.now();
+    const elapsed = now - this.lastRequestTime;
+    if (elapsed < this.minRequestInterval) {
+      const waitTime = this.minRequestInterval - elapsed;
+      logger.debug(`Rate limit: waiting ${waitTime}ms before next request`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    this.lastRequestTime = Date.now();
 
     logger.info(`Processing segment: ${item.id}`, {
       processingCount: this.processing.size,
