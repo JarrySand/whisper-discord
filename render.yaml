@@ -1,0 +1,67 @@
+# =============================================================================
+# Render Blueprint
+# =============================================================================
+# Render へのデプロイ設定
+# 使用方法: Render Dashboard で「New Blueprint」からこのファイルを使用
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Whisper API Server (Web Service)
+  # ===========================================================================
+  - type: web
+    name: whisper-api
+    runtime: docker
+    dockerfilePath: ./whisper-api/Dockerfile
+    dockerContext: ./whisper-api
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: WHISPER_PROVIDER
+        value: groq
+      - key: WHISPER_GROQ_API_KEY
+        sync: false  # 手動で設定
+      - key: WHISPER_GROQ_MODEL
+        value: whisper-large-v3
+      - key: SERVER_HOST
+        value: "0.0.0.0"
+      - key: SERVER_PORT
+        value: "8000"
+      - key: LOG_LEVEL
+        value: INFO
+
+  # ===========================================================================
+  # Discord Bot (Background Worker)
+  # ===========================================================================
+  - type: worker
+    name: discord-bot
+    runtime: docker
+    dockerfilePath: ./bot/Dockerfile
+    dockerContext: ./bot
+    plan: free
+    envVars:
+      - key: DISCORD_BOT_TOKEN
+        sync: false  # 手動で設定
+      - key: DISCORD_CLIENT_ID
+        sync: false  # 手動で設定
+      # WHISPER_API_URL は Whisper API デプロイ後に手動設定
+      # 形式: https://whisper-api-xxxx.onrender.com
+      - key: WHISPER_API_URL
+        sync: false
+      - key: WHISPER_API_TIMEOUT
+        value: "60000"
+      - key: AUDIO_SILENCE_THRESHOLD
+        value: "800"
+      - key: AUDIO_MAX_SEGMENT_DURATION
+        value: "8000"
+      - key: AUDIO_MIN_SEGMENT_DURATION
+        value: "1000"
+      - key: AUDIO_MIN_RMS_THRESHOLD
+        value: "0.005"
+      - key: OUTPUT_ENABLE_DISCORD_POST
+        value: "true"
+      - key: OUTPUT_ENABLE_FILE_LOG
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
+
