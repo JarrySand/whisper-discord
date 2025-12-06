@@ -11,6 +11,9 @@ export class AudioBufferManager {
   private segmenter: AudioSegmenter;
   private readonly maxBufferDuration: number;
   private readonly silenceThreshold: number;
+  
+  // フラッシュ中フラグ（重複フラッシュ防止）
+  private flushingUsers = new Set<string>();
 
   // セグメント生成時のコールバック
   private onSegmentCallback?: (segment: AudioSegment) => Promise<void>;
@@ -47,8 +50,8 @@ export class AudioBufferManager {
     buffer.chunks.push({ data, timestamp: now });
     buffer.lastActivityTimestamp = now;
 
-    // 最大長に達したら強制セグメント化
-    if (this.getBufferDuration(buffer) >= this.maxBufferDuration) {
+    // 最大長に達したら強制セグメント化（フラッシュ中でなければ）
+    if (!this.flushingUsers.has(userId) && this.getBufferDuration(buffer) >= this.maxBufferDuration) {
       void this.flushBuffer(userId);
     }
   }
@@ -101,8 +104,16 @@ export class AudioBufferManager {
    * バッファをセグメントとして出力
    */
   async flushBuffer(userId: string): Promise<void> {
+    // すでにフラッシュ中の場合はスキップ
+    if (this.flushingUsers.has(userId)) {
+      return;
+    }
+    
     const buffer = this.buffers.get(userId);
     if (!buffer || buffer.chunks.length === 0) return;
+
+    // フラッシュ中フラグを設定
+    this.flushingUsers.add(userId);
 
     try {
       const segment = await this.segmenter.createSegment(buffer);
@@ -121,15 +132,20 @@ export class AudioBufferManager {
     } catch (error) {
       logger.error(`Error flushing buffer for user ${userId}:`, error);
       this.resetBuffer(userId);
+    } finally {
+      // フラッシュ中フラグを解除
+      this.flushingUsers.delete(userId);
     }
   }
 
   /**
-   * バッファをリセット
+   * バッファをリセット（メモリを積極的に解放）
    */
   private resetBuffer(userId: string): void {
     const buffer = this.buffers.get(userId);
     if (buffer) {
+      // 明示的にchunksをクリアしてGCを促す
+      buffer.chunks.length = 0;
       buffer.chunks = [];
       buffer.startTimestamp = null;
     }
@@ -150,6 +166,7 @@ export class AudioBufferManager {
    */
   clear(): void {
     this.buffers.clear();
+    this.flushingUsers.clear();
   }
 
   /**

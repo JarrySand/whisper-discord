@@ -53,10 +53,10 @@ export const botConfig: BotConfig = {
   audio: {
     sampleRate: 48000,
     channels: 2,
-    silenceThreshold: getEnvNumberOrDefault('AUDIO_SILENCE_THRESHOLD', 600),
-    maxSegmentDuration: getEnvNumberOrDefault('AUDIO_MAX_SEGMENT_DURATION', 10000),
+    silenceThreshold: getEnvNumberOrDefault('AUDIO_SILENCE_THRESHOLD', 1500),
+    maxSegmentDuration: getEnvNumberOrDefault('AUDIO_MAX_SEGMENT_DURATION', 30000),
     minSegmentDuration: getEnvNumberOrDefault('AUDIO_MIN_SEGMENT_DURATION', 500),
-    minRmsThreshold: parseFloat(process.env['AUDIO_MIN_RMS_THRESHOLD'] ?? '0.005'),  // 低エネルギーセグメント除去（コスト削減）
+    minRmsThreshold: parseFloat(process.env['AUDIO_MIN_RMS_THRESHOLD'] ?? '0.01'),  // 低エネルギーセグメント除去（コスト削減・ハルシネーション防止）
   },
 
   // Whisper API

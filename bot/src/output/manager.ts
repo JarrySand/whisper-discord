@@ -116,10 +116,9 @@ export class OutputManager {
       );
     }
 
-    // SQLite: guildIdごとに個別DBを管理するマネージャーを初期化（動的インポート）
-    if (this.config.sqlite.enabled) {
-      this.initSqlite();
-    }
+    // SQLite: 外部から設定されない場合のみ自前で初期化（動的インポート）
+    // 通常はbot.tsのSqliteStoreManagerを共有する
+    // this.initSqlite() は setSqliteStoreManager() で設定されない場合のフォールバック
 
     logger.info('OutputManager initialized', {
       discord: this.config.discord.enabled,
@@ -131,20 +130,11 @@ export class OutputManager {
   }
 
   /**
-   * SQLite を動的に初期化（メモリ節約のため条件付きインポート）
+   * 外部からSqliteStoreManagerを設定（bot.tsのインスタンスを共有）
    */
-  private async initSqlite(): Promise<void> {
-    try {
-      const { SqliteStoreManager } = await import('./sqlite-store.js');
-      const sqliteConfig = this.config.sqlite.config as SqliteStoreConfig;
-      this.sqliteStoreManager = new SqliteStoreManager(
-        sqliteConfig.dbDir,
-        sqliteConfig.cleanupDays
-      );
-      logger.info('SQLite dynamically loaded');
-    } catch (error) {
-      logger.error('Failed to load SQLite:', error);
-    }
+  setSqliteStoreManager(manager: SqliteStoreManager): void {
+    this.sqliteStoreManager = manager;
+    logger.info('OutputManager: SqliteStoreManager set from external source');
   }
 
   /**

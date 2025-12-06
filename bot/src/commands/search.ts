@@ -24,6 +24,13 @@ export function setSqliteStoreManager(manager: SqliteStoreManager | null): void 
 }
 
 /**
+ * SQLiteストアマネージャーを取得（OutputManagerとの共有用）
+ */
+export function getSqliteStoreManager(): SqliteStoreManager | null {
+  return sqliteStoreManager;
+}
+
+/**
  * タイムスタンプをフォーマット
  */
 function formatTimestamp(seconds: number): string {

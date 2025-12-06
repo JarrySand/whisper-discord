@@ -17,6 +17,7 @@ import { connectionManager } from '../voice/connection.js';
 import { VoiceReceiverHandler } from '../voice/receiver.js';
 import { TranscriptionService } from '../services/transcription-service.js';
 import { guildSettings } from '../services/guild-settings.js';
+import { getSqliteStoreManager } from './index.js';
 
 export const joinCommand: Command = {
   data: new SlashCommandBuilder()
@@ -182,8 +183,21 @@ export const joinCommand: Command = {
               baseDir: botConfig.output.logDir,
             },
           },
+          sqlite: {
+            enabled: botConfig.output.enableSqlite,
+            config: {
+              dbDir: botConfig.output.sqliteDbDir,
+              cleanupDays: botConfig.output.sqliteCleanupDays,
+            },
+          },
         },
       });
+
+      // bot.tsのSqliteStoreManagerをOutputManagerに共有（検索機能と同一インスタンスを使用）
+      const sharedSqliteManager = getSqliteStoreManager();
+      if (sharedSqliteManager && transcriptionService.getOutputManager()) {
+        transcriptionService.getOutputManager()!.setSqliteStoreManager(sharedSqliteManager);
+      }
 
       // 文字起こしサービスを開始
       await transcriptionService.start({

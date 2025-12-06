@@ -2,7 +2,7 @@ import type { Command } from '../types/index.js';
 import { joinCommand } from './join.js';
 import { leaveCommand } from './leave.js';
 import { statusCommand } from './status.js';
-import { searchCommand, setSqliteStoreManager } from './search.js';
+import { searchCommand, setSqliteStoreManager, getSqliteStoreManager } from './search.js';
 
 /**
  * 利用可能なすべてのコマンド
@@ -14,5 +14,5 @@ export const commands: Command[] = [
   searchCommand,
 ];
 
-export { joinCommand, leaveCommand, statusCommand, searchCommand, setSqliteStoreManager };
+export { joinCommand, leaveCommand, statusCommand, searchCommand, setSqliteStoreManager, getSqliteStoreManager };
 

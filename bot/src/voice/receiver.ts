@@ -32,6 +32,7 @@ export class VoiceReceiverHandler extends EventEmitter {
   private ssrcMapper: SSRCMapper;
   private bufferManager: AudioBufferManager;
   private activeStreams = new Map<string, Readable>();
+  private activeDecoders = new Map<string, prism.opus.Decoder>(); // デコーダーを再利用
   private daveErrorCount = 0;
   private daveErrorThreshold = 3; // 連続3回でリセット要求
   private daveErrorResetTime = 30000; // 30秒でカウントリセット
@@ -88,18 +89,22 @@ export class VoiceReceiverHandler extends EventEmitter {
     const opusStream = this.receiver.subscribe(userId, {
       end: {
         behavior: EndBehaviorType.AfterSilence,
-        duration: 600, // 600ms の無音で終了
+        duration: 1500, // 1.5秒の無音で終了（自然な会話ペースに対応）
       },
     });
 
     this.activeStreams.set(userId, opusStream);
 
-    // Opus → PCM デコード
+    // Opus → PCM デコード（パイプ後は再利用できないため毎回新規作成）
+    // 既存のデコーダーがあればクリーンアップ
+    this.cleanupDecoder(userId);
+    
     const decoder = new prism.opus.Decoder({
       rate: 48000,
       channels: 2,
       frameSize: 960,
     });
+    this.activeDecoders.set(userId, decoder);
 
     // バッファに追加
     const userInfo = this.ssrcMapper.getByUserId(userId);
@@ -129,11 +134,14 @@ export class VoiceReceiverHandler extends EventEmitter {
 
     opusStream.on('end', () => {
       this.handleStreamEnd(userId);
+      // デコーダーをクリーンアップ（再利用せず新規作成）
+      this.cleanupDecoder(userId);
     });
 
     opusStream.on('error', (error: Error) => {
       logger.error(`Opus stream error for user ${userId}:`, error);
       this.activeStreams.delete(userId);
+      this.cleanupDecoder(userId);
     });
   }
 
@@ -155,6 +163,21 @@ export class VoiceReceiverHandler extends EventEmitter {
 
     // 無音検知で区切られたバッファを処理
     void this.bufferManager.checkAndFlush(userId);
+  }
+
+  /**
+   * ユーザーのデコーダーをクリーンアップ
+   */
+  private cleanupDecoder(userId: string): void {
+    const decoder = this.activeDecoders.get(userId);
+    if (decoder) {
+      try {
+        decoder.destroy();
+      } catch {
+        // 既に破棄されている場合は無視
+      }
+      this.activeDecoders.delete(userId);
+    }
   }
 
   /**
@@ -219,11 +242,24 @@ export class VoiceReceiverHandler extends EventEmitter {
    * クリーンアップ
    */
   cleanup(): void {
+    // ストリームを破棄
     for (const [userId, stream] of this.activeStreams) {
       stream.destroy();
       logger.debug(`Destroyed stream for user ${userId}`);
     }
     this.activeStreams.clear();
+    
+    // デコーダーを破棄（メモリリーク防止）
+    for (const [userId, decoder] of this.activeDecoders) {
+      try {
+        decoder.destroy();
+        logger.debug(`Destroyed decoder for user ${userId}`);
+      } catch {
+        // 既に破棄されている場合は無視
+      }
+    }
+    this.activeDecoders.clear();
+    
     this.ssrcMapper.clear();
     this.bufferManager.clear();
     this.daveErrorCount = 0;

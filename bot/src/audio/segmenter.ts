@@ -70,8 +70,10 @@ export class AudioSegmenter {
       return null;
     }
 
-    // PCMデータを結合
+    // PCMデータを結合（メモリ効率のためchunksをクリア）
     const pcmData = Buffer.concat(buffer.chunks.map((c) => c.data));
+    // 元のchunksへの参照を解除してGCを促す
+    buffer.chunks.length = 0;
 
     // 低エネルギー（ほぼ無音）セグメントは破棄（コスト削減）
     const rms = this.calculateRMS(pcmData);
@@ -84,7 +86,9 @@ export class AudioSegmenter {
     }
 
     // 48kHz Stereo → 16kHz Mono にリサンプリング
+    // 注: リサンプリング後はpcmDataへの参照を維持しない（GC対象に）
     const resampledData = this.resampler.resample(pcmData);
+    // pcmData への参照は以降不要（GC可能に）
 
     // OGGにエンコード（失敗時はWAV）
     let audioData: Buffer;
@@ -99,13 +103,22 @@ export class AudioSegmenter {
       audioFormat = 'wav';
     }
 
+    // タイムスタンプがnullの場合は現在時刻からdurationを引いた値を使用
+    const endTimestamp = buffer.lastActivityTimestamp;
+    const startTimestamp = buffer.startTimestamp ?? (endTimestamp - duration);
+    
+    // タイムスタンプの妥当性チェック（1970年より前やnullはありえない）
+    if (startTimestamp <= 0 || !Number.isFinite(startTimestamp)) {
+      logger.warn(`Invalid startTimestamp detected: ${startTimestamp}, using current time`);
+    }
+
     const segment: AudioSegment = {
       id: uuidv4(),
       userId: buffer.userId,
       username: buffer.username,
       displayName: buffer.displayName,
-      startTimestamp: buffer.startTimestamp!,
-      endTimestamp: buffer.lastActivityTimestamp,
+      startTimestamp: startTimestamp > 0 ? startTimestamp : Date.now() - duration,
+      endTimestamp,
       duration,
       audioData,
       audioFormat,

@@ -35,12 +35,6 @@ export class Bot {
     });
 
     this.commands = new Collection();
-    
-    // Initialize SQLite store manager if enabled (動的インポートで非同期)
-    if (botConfig.output.enableSqlite) {
-      this.initSqlite();
-    }
-    
     this.loadCommands();
     this.setupEventHandlers();
   }
@@ -197,6 +191,11 @@ export class Bot {
   async start(): Promise<void> {
     try {
       logger.info('Starting bot...');
+      
+      // SQLite を初期化（有効な場合）
+      if (botConfig.output.enableSqlite) {
+        await this.initSqlite();
+      }
       
       // サーバー設定を初期化
       await guildSettings.initialize();

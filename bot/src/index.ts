@@ -1,6 +1,10 @@
 import { Bot } from './bot.js';
 import { logger } from './utils/logger.js';
 
+// 注意: @snazzah/davey は DAVE（E2EE）対応サーバーのみで使用
+// DAVE非対応サーバーでは逆にエラーになるため、デフォルトでは無効
+// 必要に応じて: import '@snazzah/davey';
+
 /**
  * メインエントリーポイント
  */
