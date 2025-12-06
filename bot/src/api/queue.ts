@@ -38,8 +38,8 @@ export class TranscriptionQueue extends EventEmitter {
     this.config = {
       maxSize: config.maxSize ?? 100,
       maxRetries: config.maxRetries ?? 3,
-      concurrency: config.concurrency ?? 2,
-      processingTimeout: config.processingTimeout ?? 120000,
+      concurrency: config.concurrency ?? 1,  // レート制限対策: 1つずつ処理
+      processingTimeout: config.processingTimeout ?? 60000,  // タイムアウト短縮
     };
 
     logger.debug('TranscriptionQueue initialized', { config: this.config });
@@ -97,14 +97,22 @@ export class TranscriptionQueue extends EventEmitter {
    * 次のアイテムを処理
    */
   private async processNext(): Promise<void> {
-    if (!this.isRunning) return;
-    if (this.processing.size >= this.config.concurrency) return;
-    if (this.queue.length === 0) return;
+    if (!this.isRunning) {
+      logger.debug('Queue not running, skipping processNext');
+      return;
+    }
+    if (this.processing.size >= this.config.concurrency) {
+      logger.debug(`Queue at max concurrency (${this.processing.size}/${this.config.concurrency}), waiting`);
+      return;
+    }
+    if (this.queue.length === 0) {
+      return;
+    }
 
     const item = this.queue.shift()!;
     this.processing.set(item.id, item);
 
-    logger.debug(`Processing segment: ${item.id}`, {
+    logger.info(`Processing segment: ${item.id}`, {
       processingCount: this.processing.size,
       queueLength: this.queue.length,
     });

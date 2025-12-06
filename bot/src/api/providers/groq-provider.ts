@@ -30,9 +30,9 @@ export interface GroqConfig extends BaseProviderConfig {
 
 const DEFAULT_CONFIG: Omit<GroqConfig, 'type' | 'apiKey'> = {
   model: 'whisper-large-v3',
-  timeout: 60000,
-  retryCount: 3,
-  retryDelay: 1000,
+  timeout: 30000,  // 30秒タイムアウト
+  retryCount: 1,   // リトライ1回のみ（レート制限対策）
+  retryDelay: 2000, // 2秒待機
 };
 
 export class GroqProvider implements TranscriptionProvider {
@@ -70,6 +70,12 @@ export class GroqProvider implements TranscriptionProvider {
   async transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     const startTime = Date.now();
 
+    logger.info(`Groq transcribe called`, {
+      audioSize: request.audioData.length,
+      format: request.audioFormat,
+      language: request.language,
+    });
+
     try {
       const formData = new FormData();
 
@@ -90,6 +96,7 @@ export class GroqProvider implements TranscriptionProvider {
       // レスポンス形式
       formData.append('response_format', 'verbose_json');
 
+      logger.debug('Sending request to Groq API...');
       const response = await this.executeWithRetry(async () => {
         return await this.client.post('/audio/transcriptions', formData, {
           headers: formData.getHeaders(),
@@ -99,7 +106,10 @@ export class GroqProvider implements TranscriptionProvider {
       const data = response.data;
       const processingTimeMs = Date.now() - startTime;
 
-      logger.debug(`Groq transcription completed in ${processingTimeMs}ms`);
+      logger.info(`Groq transcription completed in ${processingTimeMs}ms`, {
+        textLength: data.text?.length,
+        text: data.text?.substring(0, 50),
+      });
 
       return {
         success: true,
@@ -111,13 +121,25 @@ export class GroqProvider implements TranscriptionProvider {
     } catch (error) {
       const processingTimeMs = Date.now() - startTime;
       const message = error instanceof Error ? error.message : 'Unknown error';
-
-      logger.error('GroqProvider transcription failed:', { error: message });
+      
+      // レート制限エラーの検出
+      const axiosError = error as { response?: { status?: number; data?: unknown } };
+      if (axiosError.response?.status === 429) {
+        logger.error('Groq API rate limit exceeded!', {
+          status: 429,
+          data: axiosError.response.data,
+        });
+      } else {
+        logger.error('GroqProvider transcription failed:', { 
+          error: message,
+          status: axiosError.response?.status,
+        });
+      }
 
       return {
         success: false,
         error: {
-          code: 'TRANSCRIPTION_FAILED',
+          code: axiosError.response?.status === 429 ? 'RATE_LIMIT' : 'TRANSCRIPTION_FAILED',
           message,
         },
         processingTimeMs,
