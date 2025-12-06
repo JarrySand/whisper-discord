@@ -12,8 +12,9 @@ import { logger } from './utils/logger.js';
 import type { Command } from './types/index.js';
 import { commands, setSqliteStoreManager } from './commands/index.js';
 import { connectionManager } from './voice/connection.js';
-import { SqliteStoreManager } from './output/sqlite-store.js';
 import { guildSettings } from './services/guild-settings.js';
+// SQLite は条件付きで動的インポート（メモリ節約）
+type SqliteStoreManager = import('./output/sqlite-store.js').SqliteStoreManager;
 
 /**
  * Discord Bot クラス
@@ -35,24 +36,32 @@ export class Bot {
 
     this.commands = new Collection();
     
-    // Initialize SQLite store manager if enabled
+    // Initialize SQLite store manager if enabled (動的インポートで非同期)
     if (botConfig.output.enableSqlite) {
-      try {
-        this.sqliteStoreManager = new SqliteStoreManager(
-          botConfig.output.sqliteDbDir,
-          botConfig.output.sqliteCleanupDays
-        );
-        setSqliteStoreManager(this.sqliteStoreManager);
-        logger.info('SQLite store manager initialized', { 
-          dbDir: botConfig.output.sqliteDbDir 
-        });
-      } catch (error) {
-        logger.error('Failed to initialize SQLite store manager', { error });
-      }
+      this.initSqlite();
     }
     
     this.loadCommands();
     this.setupEventHandlers();
+  }
+
+  /**
+   * SQLite を動的に初期化（メモリ節約のため条件付きインポート）
+   */
+  private async initSqlite(): Promise<void> {
+    try {
+      const { SqliteStoreManager } = await import('./output/sqlite-store.js');
+      this.sqliteStoreManager = new SqliteStoreManager(
+        botConfig.output.sqliteDbDir,
+        botConfig.output.sqliteCleanupDays
+      );
+      setSqliteStoreManager(this.sqliteStoreManager);
+      logger.info('SQLite store manager initialized', { 
+        dbDir: botConfig.output.sqliteDbDir 
+      });
+    } catch (error) {
+      logger.error('Failed to initialize SQLite store manager', { error });
+    }
   }
 
   /**

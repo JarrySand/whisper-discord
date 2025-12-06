@@ -73,5 +73,5 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD node -e "console.log('healthy')" || exit 1
 
-# Run the bot
-CMD ["node", "dist/index.js"]
+# Run the bot with memory optimization
+CMD ["node", "--max-old-space-size=384", "--optimize-for-size", "dist/index.js"]

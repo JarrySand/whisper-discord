@@ -9,8 +9,9 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import type { Command } from '../types/index.js';
-import { SqliteStoreManager } from '../output/sqlite-store.js';
 import { logger } from '../utils/logger.js';
+// SQLite は条件付きインポート（メモリ節約）
+type SqliteStoreManager = import('../output/sqlite-store.js').SqliteStoreManager;
 
 // SQLite store manager instance (will be set from outside)
 let sqliteStoreManager: SqliteStoreManager | null = null;

@@ -13,7 +13,9 @@ import { DiscordOutputService } from './discord.js';
 import { FileLoggerService } from './file-logger.js';
 import { JsonStoreService } from './json-store.js';
 import { MarkdownWriterService } from './markdown-writer.js';
-import { SqliteStore, SqliteStoreManager } from './sqlite-store.js';
+// SQLite は条件付きで動的インポート（メモリ節約）
+type SqliteStore = import('./sqlite-store.js').SqliteStore;
+type SqliteStoreManager = import('./sqlite-store.js').SqliteStoreManager;
 import type {
   TranscriptionResult,
   OutputManagerConfig,
@@ -114,13 +116,9 @@ export class OutputManager {
       );
     }
 
-    // SQLite: guildIdごとに個別DBを管理するマネージャーを初期化
+    // SQLite: guildIdごとに個別DBを管理するマネージャーを初期化（動的インポート）
     if (this.config.sqlite.enabled) {
-      const sqliteConfig = this.config.sqlite.config as SqliteStoreConfig;
-      this.sqliteStoreManager = new SqliteStoreManager(
-        sqliteConfig.dbDir,
-        sqliteConfig.cleanupDays
-      );
+      this.initSqlite();
     }
 
     logger.info('OutputManager initialized', {
@@ -130,6 +128,23 @@ export class OutputManager {
       markdown: this.config.markdown.enabled,
       sqlite: this.config.sqlite.enabled,
     });
+  }
+
+  /**
+   * SQLite を動的に初期化（メモリ節約のため条件付きインポート）
+   */
+  private async initSqlite(): Promise<void> {
+    try {
+      const { SqliteStoreManager } = await import('./sqlite-store.js');
+      const sqliteConfig = this.config.sqlite.config as SqliteStoreConfig;
+      this.sqliteStoreManager = new SqliteStoreManager(
+        sqliteConfig.dbDir,
+        sqliteConfig.cleanupDays
+      );
+      logger.info('SQLite dynamically loaded');
+    } catch (error) {
+      logger.error('Failed to load SQLite:', error);
+    }
   }
 
   /**
