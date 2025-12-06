@@ -7,9 +7,19 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build
 # -----------------------------------------------------------------------------
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
+
+# Install build tools for native modules (@discordjs/opus)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    libtool \
+    autoconf \
+    automake \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -27,11 +37,11 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 # Stage 2: Production
 # -----------------------------------------------------------------------------
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
-# Install system dependencies for native modules
+# Install system dependencies for native modules and runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -50,9 +60,6 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
-
-# Copy config files if they exist
-COPY config/ ./config/ 2>/dev/null || true
 
 # Create required directories
 RUN mkdir -p /app/logs /app/data /app/segments

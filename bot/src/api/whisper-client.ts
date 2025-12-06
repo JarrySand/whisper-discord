@@ -1,13 +1,18 @@
 /**
  * Whisper API クライアント
- * - リトライロジック
- * - タイムアウト処理
- * - エラーハンドリング
+ * - 環境変数に基づいてプロバイダーを選択
+ * - self-hosted, groq, openai をサポート
  */
 import axios, { AxiosInstance, isAxiosError } from 'axios';
 import FormData from 'form-data';
 import { logger } from '../utils/logger.js';
 import { botConfig } from '../config/index.js';
+import { createProviderFromEnv } from './providers/index.js';
+import type {
+  TranscriptionProvider,
+  TranscriptionRequest,
+  TranscriptionResponse,
+} from './transcription-provider.js';
 import type {
   WhisperClientConfig,
   TranscribeRequest,
@@ -17,14 +22,25 @@ import type {
 
 /**
  * Whisper APIクライアント
+ * 
+ * 環境変数 TRANSCRIPTION_PROVIDER に基づいてプロバイダーを選択:
+ * - "self-hosted" または未設定: セルフホスト Whisper API
+ * - "groq": Groq Whisper API
+ * - "openai": OpenAI Whisper API
  */
 export class WhisperClient {
-  private client: AxiosInstance;
+  private client: AxiosInstance | null = null;
   private config: WhisperClientConfig;
   private isHealthy = true;
   private lastHealthCheck = 0;
+  
+  // 新しいプロバイダーシステム
+  private provider: TranscriptionProvider | null = null;
+  private providerType: string;
 
   constructor(config: Partial<WhisperClientConfig> = {}) {
+    this.providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
+    
     this.config = {
       baseUrl: config.baseUrl ?? botConfig.whisper.apiUrl,
       timeout: config.timeout ?? botConfig.whisper.timeout,
@@ -33,18 +49,89 @@ export class WhisperClient {
       retryBackoffMultiplier: config.retryBackoffMultiplier ?? 2,
     };
 
-    this.client = axios.create({
-      baseURL: this.config.baseUrl,
-      timeout: this.config.timeout,
-    });
-
-    logger.info(`WhisperClient initialized: ${this.config.baseUrl}`);
+    // プロバイダータイプに応じて初期化
+    if (this.providerType === 'groq' || this.providerType === 'openai') {
+      // クラウドプロバイダーを使用
+      this.provider = createProviderFromEnv();
+      logger.info(`WhisperClient initialized with ${this.providerType} provider`);
+    } else {
+      // セルフホスト Whisper API を使用
+      this.client = axios.create({
+        baseURL: this.config.baseUrl,
+        timeout: this.config.timeout,
+      });
+      logger.info(`WhisperClient initialized: ${this.config.baseUrl}`);
+    }
   }
 
   /**
    * 単一セグメントを文字起こし
    */
   async transcribe(request: TranscribeRequest): Promise<TranscribeResponse> {
+    // クラウドプロバイダーを使用する場合
+    if (this.provider) {
+      return this.transcribeWithProvider(request);
+    }
+
+    // セルフホスト Whisper API を使用する場合
+    return this.transcribeWithSelfHosted(request);
+  }
+
+  /**
+   * クラウドプロバイダーで文字起こし
+   */
+  private async transcribeWithProvider(request: TranscribeRequest): Promise<TranscribeResponse> {
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+
+    const providerRequest: TranscriptionRequest = {
+      audioData: request.audioData,
+      audioFormat: request.audioFormat,
+      language: request.language ?? 'ja',
+      userId: request.userId,
+      username: request.username,
+    };
+
+    const startTime = Date.now();
+    const response: TranscriptionResponse = await this.provider.transcribe(providerRequest);
+    const processingTime = Date.now() - startTime;
+
+    if (response.success) {
+      return {
+        success: true,
+        data: {
+          user_id: request.userId,
+          username: request.username,
+          display_name: request.displayName ?? null,
+          text: response.text ?? '',
+          start_ts: request.startTs,
+          end_ts: request.endTs,
+          duration_ms: request.endTs - request.startTs,
+          language: response.language ?? 'ja',
+          confidence: response.confidence ?? 0.9,
+          processing_time_ms: processingTime,
+        },
+      };
+    } else {
+      return {
+        success: false,
+        error: {
+          code: response.error?.code ?? 'TRANSCRIPTION_FAILED',
+          message: response.error?.message ?? 'Transcription failed',
+        },
+      };
+    }
+  }
+
+  /**
+   * セルフホスト Whisper API で文字起こし
+   */
+  private async transcribeWithSelfHosted(request: TranscribeRequest): Promise<TranscribeResponse> {
+    if (!this.client) {
+      throw new Error('HTTP client not initialized');
+    }
+
     const formData = new FormData();
 
     // 音声ファイル
@@ -64,7 +151,7 @@ export class WhisperClient {
     formData.append('language', request.language ?? 'ja');
 
     return this.executeWithRetry(async () => {
-      const response = await this.client.post<TranscribeResponse>(
+      const response = await this.client!.post<TranscribeResponse>(
         '/transcribe',
         formData,
         {
@@ -81,6 +168,21 @@ export class WhisperClient {
   async transcribeBatch(requests: TranscribeRequest[]): Promise<TranscribeResponse[]> {
     if (requests.length === 0) {
       return [];
+    }
+
+    // クラウドプロバイダーの場合は順次処理
+    if (this.provider) {
+      const results: TranscribeResponse[] = [];
+      for (const request of requests) {
+        const result = await this.transcribe(request);
+        results.push(result);
+      }
+      return results;
+    }
+
+    // セルフホスト API の場合はバッチ処理
+    if (!this.client) {
+      throw new Error('HTTP client not initialized');
     }
 
     const formData = new FormData();
@@ -113,7 +215,7 @@ export class WhisperClient {
     formData.append('metadata', JSON.stringify(metadata));
 
     return this.executeWithRetry(async () => {
-      const response = await this.client.post<{
+      const response = await this.client!.post<{
         success: boolean;
         data: { results: TranscribeResponse[] };
       }>('/transcribe/batch', formData, {
@@ -128,6 +230,28 @@ export class WhisperClient {
    * APIヘルスチェック
    */
   async healthCheck(): Promise<HealthCheckResponse> {
+    // クラウドプロバイダーの場合
+    if (this.provider) {
+      const health = await this.provider.healthCheck();
+      this.isHealthy = health.isHealthy;
+      this.lastHealthCheck = Date.now();
+      return {
+        status: health.isHealthy ? 'healthy' : 'unhealthy',
+        model_loaded: true,
+        model_name: (health.details?.model as string) ?? this.providerType,
+        device: 'cloud',
+        compute_type: 'api',
+        uptime_seconds: 0,
+        requests_processed: 0,
+        avg_processing_time_ms: 0,
+      };
+    }
+
+    // セルフホスト API の場合
+    if (!this.client) {
+      throw new Error('HTTP client not initialized');
+    }
+
     try {
       const response = await this.client.get<HealthCheckResponse>('/health', {
         timeout: 5000,
@@ -220,7 +344,13 @@ export class WhisperClient {
   getConfig(): WhisperClientConfig {
     return { ...this.config };
   }
+
+  /**
+   * プロバイダータイプを取得
+   */
+  getProviderType(): string {
+    return this.providerType;
+  }
 }
 
 export default WhisperClient;
-
