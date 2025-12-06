@@ -1,151 +1,153 @@
-# 🚧 デプロイ問題：メモリ不足
+# ✅ デプロイ問題：メモリ不足 - 解決済み
 
-## 📋 現状
+## 📋 結果サマリー
 
-Discord 音声文字起こし Bot を **Render** (Background Worker, 512MB RAM, $7/月) にデプロイしたが、**メモリ不足 (OOM)** でクラッシュする問題が発生中。
+Discord 音声文字起こし Bot を **Render** (Background Worker, 512MB RAM, $7/月) に正常にデプロイ完了。
 
-## ✅ 実施済みの最適化（2024-12-06）
+| 項目 | 結果 |
+|------|------|
+| **メモリ使用量** | 約80MB / 512MB (16%) |
+| **安定性** | ✅ OOMなし、安定動作 |
+| **機能** | ✅ 文字起こし、検索、ファイルログ全て動作 |
 
-### 1. 音声セグメント長の短縮
+---
+
+## 🔧 実施した最適化（2024-12-06）
+
+### 1. 同時フラッシュ防止（根本原因の修正）
+
+**問題**: `flushBuffer()` が同一ユーザーに対して複数回同時実行され、大量のFFmpegプロセスとAPI呼び出しが発生してOOMを引き起こしていた。
+
+```typescript
+// buffer.ts
+private flushingUsers = new Set<string>();
+
+async flushBuffer(userId: string): Promise<void> {
+  if (this.flushingUsers.has(userId)) return; // 既にフラッシュ中なら何もしない
+  this.flushingUsers.add(userId);
+  try {
+    // ... フラッシュ処理 ...
+  } finally {
+    this.flushingUsers.delete(userId);
+  }
+}
+```
+
+### 2. セグメント長の最適化
 
 ```diff
 - maxSegmentDuration: 10000ms (10秒)
-+ maxSegmentDuration: 5000ms (5秒)
++ maxSegmentDuration: 30000ms (30秒)
 ```
 
-**効果**: 音声バッファのメモリ使用量を約50%削減
+**効果**: 
+- API呼び出し回数を1/3に削減
+- より自然な文脈でのWhisper処理
+- コスト効率の向上
 
-### 2. メモリ解放の明示化
+### 3. 沈黙閾値の調整
+
+```diff
+- silenceThreshold: 600ms (0.6秒)
++ silenceThreshold: 1500ms (1.5秒)
+```
+
+**効果**: 自然な会話の間で不要な分断を防止
+
+### 4. メモリ解放の明示化
 
 - `segmenter.ts`: PCMデータ結合後に元のchunksへの参照を解除
 - `buffer.ts`: バッファリセット時に明示的にメモリをクリア
+- `receiver.ts`: Opusデコーダーの適切な破棄
 
-### 3. Opusデコーダーの適切な管理
+### 5. DAVEプロトコルの無効化
 
-- `receiver.ts`: ユーザーごとにデコーダーを管理し、ストリーム終了時に破棄
-- メモリリークの防止
+```typescript
+// index.ts - E2EE非対応サーバーでのエラー防止
+// import '@snazzah/davey';  // コメントアウト
+```
 
-### 4. メモリ監視スクリプトの強化
+### 6. SQLite共有問題の修正
 
-- `memory-monitor.ts`: 512MB制限を想定した詳細な監視
-- `memory-stress-test.ts`: Discord接続なしでの負荷テスト
+`bot.ts` と `OutputManager` で別々のSqliteStoreManagerインスタンスが作成されていた問題を修正。
+共有インスタンスを使用するように変更。
+
+---
 
 ## 📊 メモリ使用量テスト結果
 
-### 静的インポート時（モジュール読み込みのみ）
+### 実際のBot動作時（30秒セグメント、SQLite有効）
 
 ```
-初期状態:      30 MB
-discord.js:    70 MB (+40 MB)
-@discordjs/voice: 75 MB (+5 MB)
-最終:          75 MB
+[04:35:02] RSS:  80.1MB/512MB (15.6%) ████░░░░░░░░░░░░░░░░░░░░░░░░░░
+[04:35:07] RSS:  80.3MB/512MB (15.7%) ████░░░░░░░░░░░░░░░░░░░░░░░░░░
+[04:35:12] RSS:  80.4MB/512MB (15.7%) ████░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
-### 動的ストレステスト（音声処理シミュレーション）
+| 状態 | RSS使用量 | 512MB比 |
+|------|-----------|---------|
+| 起動直後 | 65 MB | 12.7% |
+| VC参加後 | 75 MB | 14.6% |
+| 文字起こし中 | 80 MB | 15.6% |
+| ピーク時 | 85 MB | 16.6% |
 
-| テスト | RSS使用量 | 512MB比 |
-|--------|-----------|---------|
-| 初期状態 | 42 MB | 8.3% |
-| 単一ユーザー 5秒 | 48 MB | 9.3% |
-| 3ユーザー同時 | 55 MB | 10.8% |
-| 5ユーザー同時 | 57 MB | 11.2% |
-| 負荷テスト後 | 60 MB | 11.6% |
+**結論**: 512MBの約17%しか使用せず、非常に安定。
 
-**結論**: ローカルテストでは512MB制限の約12%しか使用していない。
+---
 
-## 🔍 問題の経緯
+## 🎯 推奨環境変数設定
 
-### 試したプラットフォーム
+```env
+# 音声処理（最適化済み）
+AUDIO_MAX_SEGMENT_DURATION=30000    # 30秒セグメント
+AUDIO_SILENCE_THRESHOLD=1500        # 1.5秒沈黙閾値
+AUDIO_MIN_SEGMENT_DURATION=1000     # 最小1秒
+AUDIO_MIN_RMS_THRESHOLD=0.005       # ノイズ除去
 
-| サービス | 結果 |
-|----------|------|
-| **Fly.io (無料, 256MB)** | メモリ不足でクラッシュ |
-| **Render ($7/月, 512MB)** | メモリ不足でクラッシュ |
-
-### エラーメッセージ
-
-```
-Ran out of memory (used over 512MB) while running your code
-```
-
-### 暗号化エラーも発生
-
-```
-Opus stream error: Failed to decrypt: DecryptionFailed(UnencryptedWhenPassthroughDisabled)
+# 機能有効化
+ENABLE_SQLITE=true                  # 検索機能
+OUTPUT_ENABLE_FILE_LOG=true         # ファイルログ
+OUTPUT_ENABLE_JSON_STORE=true       # JSON保存
+OUTPUT_ENABLE_MARKDOWN=true         # Markdown保存
 ```
 
-→ `libsodium-dev` を Dockerfile に追加済み
+---
 
-## 🧪 テスト手順
+## 📁 変更ファイル一覧
 
-### ローカルでメモリ監視テスト
+| ファイル | 変更内容 |
+|----------|----------|
+| `bot/src/audio/buffer.ts` | flushingUsersフラグ追加 |
+| `bot/src/audio/segmenter.ts` | タイムスタンプフォールバック追加 |
+| `bot/src/voice/receiver.ts` | デコーダー管理改善 |
+| `bot/src/config/index.ts` | デフォルト値更新 |
+| `bot/src/filters/hallucination-filter.ts` | パターン追加 |
+| `bot/src/index.ts` | DAVE無効化 |
+| `bot/src/bot.ts` | SQLite初期化を非同期に |
+| `bot/src/commands/join.ts` | SQLite共有設定 |
+| `bot/src/output/manager.ts` | setSqliteStoreManager追加 |
+| `bot/env.template.txt` | 推奨値更新 |
+
+---
+
+## 🧪 ローカルテスト手順
 
 ```bash
-# ビルド
 cd bot
 npm run build
 
-# 静的メモリテスト（モジュールインポートのみ）
-node dist/scripts/memory-test.js
-
-# ストレステスト（音声処理シミュレーション）
-node --expose-gc dist/scripts/memory-stress-test.js
-
 # 実際のBot起動テスト
-# ※ 事前に Render の Bot を停止してください
 node dist/scripts/memory-monitor.js
 ```
 
-### 観察ポイント
+---
 
-- `/join` 前後のメモリ変化
-- 話しかけた時のメモリ変化
-- メモリリークの有無（時間経過で増加し続けるか）
+## ✅ 完了チェックリスト
 
-## 🔧 Dockerfile設定
-
-```dockerfile
-CMD ["node", "--max-old-space-size=384", "--optimize-for-size", "dist/index.js"]
-```
-
-## 💡 追加の最適化案（未実施）
-
-### 高効果
-
-1. **同時接続ユーザー数の制限** - 3人以下に制限
-2. **音声チャンネル接続時間の制限** - 自動離脱を短く
-3. **`better-sqlite3` の完全削除** - `ENABLE_SQLITE=false` でも動的インポート
-
-### 中効果
-
-1. **より積極的なGC** - `--expose-gc` フラグで手動GC
-2. **ストリーム処理の最適化** - バッファサイズの調整
-
-## 📁 関連ファイル
-
-- `bot/Dockerfile` - Docker 設定
-- `bot/src/scripts/memory-test.ts` - 静的メモリテスト
-- `bot/src/scripts/memory-stress-test.ts` - 動的ストレステスト
-- `bot/src/scripts/memory-monitor.ts` - リアルタイム監視
-- `bot/src/audio/buffer.ts` - 音声バッファ管理
-- `bot/src/audio/segmenter.ts` - セグメント処理
-- `bot/src/voice/receiver.ts` - 音声受信ハンドラ
-
-## 🎯 目標
-
-**512MB 以内で安定動作** させる、または最適なプラン/プラットフォームを決定する。
-
-## 🔄 次のステップ
-
-1. **実際のDiscord接続でテスト** - ローカルでBot起動して確認
-2. **Renderに再デプロイ** - 最適化後の動作確認
-3. **必要に応じて追加最適化** - OOMが続く場合
-
-## 💰 代替プラン
-
-| オプション | RAM | 月額 | 備考 |
-|-----------|-----|------|------|
-| Render Standard | 1GB | $25 | 高い |
-| Railway | 柔軟 | ~$10-15 | 従量課金 |
-| Hetzner VPS | 2GB+ | ~$5 | 設定が複雑 |
-| DigitalOcean | 1GB | $6 | 中程度の難易度 |
+- [x] メモリ使用量が512MB以内で安定
+- [x] 文字起こし機能が正常動作
+- [x] 検索機能（/search）が正常動作
+- [x] ファイルログが正常出力
+- [x] タイムスタンプが正確
+- [x] ハルシネーション除去が機能
+- [x] 30秒セグメントで文脈が繋がる

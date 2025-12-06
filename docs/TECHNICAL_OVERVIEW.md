@@ -205,8 +205,8 @@ class HotwordsManager:
 
 ```typescript
 // セグメント設定
-AUDIO_SILENCE_THRESHOLD = 800   // 無音検知: 800ms
-AUDIO_MAX_SEGMENT_DURATION = 8000  // 最大長: 8秒
+AUDIO_SILENCE_THRESHOLD = 1500     // 無音検知: 1.5秒（自然な会話の間を許容）
+AUDIO_MAX_SEGMENT_DURATION = 30000 // 最大長: 30秒（文脈を保持）
 AUDIO_MIN_SEGMENT_DURATION = 1000  // 最小長: 1秒
 ```
 

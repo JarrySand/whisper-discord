@@ -1,7 +1,7 @@
 # 📖 Discord 文字起こしBot ユーザーガイド
 
-> **バージョン**: 1.1.0  
-> **最終更新**: 2025-12-05
+> **バージョン**: 1.2.0  
+> **最終更新**: 2025-12-06
 
 ---
 
@@ -442,10 +442,10 @@ WHISPER_API_URL=http://localhost:8000
 WHISPER_API_TIMEOUT=60000
 
 # === 音声処理 ===
-AUDIO_SILENCE_THRESHOLD=800      # 無音検知閾値 (ms)
-AUDIO_MAX_SEGMENT_DURATION=8000  # 最大セグメント長 (ms)
-AUDIO_MIN_SEGMENT_DURATION=1000  # 最小セグメント長 (ms)
-AUDIO_MIN_RMS_THRESHOLD=0.005    # 最小音量閾値
+AUDIO_SILENCE_THRESHOLD=1500      # 無音検知閾値 (ms) - 自然な会話の間を許容
+AUDIO_MAX_SEGMENT_DURATION=30000  # 最大セグメント長 (ms) - 30秒で文脈を保持
+AUDIO_MIN_SEGMENT_DURATION=1000   # 最小セグメント長 (ms)
+AUDIO_MIN_RMS_THRESHOLD=0.005     # 最小音量閾値
 
 # === 出力設定 ===
 OUTPUT_LOG_DIR=./logs
@@ -521,9 +521,9 @@ SERVER_PORT=8000
 
 #### 処理が遅い
 - CPU環境では1セグメントあたり5〜10秒が目安
-- 🆕 **Groq プロバイダーを使用**すると大幅に高速化
+- 🆕 **Groq プロバイダーを使用**すると大幅に高速化（推奨）
 - GPU環境への移行を検討
-- セグメント長を短くする（`AUDIO_MAX_SEGMENT_DURATION=5000`）
+- 低メモリ環境（256MB以下）ではセグメント長を短くする（`AUDIO_MAX_SEGMENT_DURATION=10000`）
 
 ### ログの確認
 

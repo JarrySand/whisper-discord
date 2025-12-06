@@ -100,10 +100,15 @@ export class Bot {
 
         const errorMessage = '❌ コマンドの実行中にエラーが発生しました';
 
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: errorMessage, ephemeral: true });
-        } else {
-          await interaction.reply({ content: errorMessage, ephemeral: true });
+        try {
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+          } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+          }
+        } catch (replyError) {
+          // 応答に失敗した場合は無視（すでに応答済みの可能性）
+          logger.debug('Failed to send error response to interaction:', replyError);
         }
       }
     });

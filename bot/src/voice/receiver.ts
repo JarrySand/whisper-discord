@@ -124,11 +124,11 @@ export class VoiceReceiverHandler extends EventEmitter {
     });
 
     decodedStream.on('error', (error: Error) => {
-      logger.error(`Error decoding audio for user ${userId}:`, error);
-      
       // DAVE プロトコルエラーの検出と処理
       if (isDAVEError(error)) {
         this.handleDAVEError(userId, error);
+      } else {
+        logger.error(`Error decoding audio for user ${userId}:`, error);
       }
     });
 
@@ -209,11 +209,12 @@ export class VoiceReceiverHandler extends EventEmitter {
     this.daveErrorCount++;
     this.lastDaveErrorTime = now;
     
-    logger.warn(`DAVE protocol error detected for user ${userId}`, {
-      errorCount: this.daveErrorCount,
-      threshold: this.daveErrorThreshold,
-      message: error.message,
-    });
+    // 初回のみ通知、その後はdebugレベル
+    if (this.daveErrorCount === 1) {
+      logger.warn(`DAVE protocol error detected for user ${userId}`, error.message);
+    } else {
+      logger.debug(`DAVE protocol error (${this.daveErrorCount}/${this.daveErrorThreshold}) for user ${userId}`);
+    }
     
     // 閾値を超えたら接続リセットを要求
     if (this.daveErrorCount >= this.daveErrorThreshold) {
