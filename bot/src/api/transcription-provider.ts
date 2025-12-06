@@ -100,7 +100,17 @@ export interface OpenAIConfig extends BaseProviderConfig {
 }
 
 /**
+ * Groq API 設定
+ * OpenAI 互換 API で whisper-large-v3 を使用
+ */
+export interface GroqConfig extends BaseProviderConfig {
+  type: 'groq';
+  apiKey: string;
+  model?: 'whisper-large-v3' | 'whisper-large-v3-turbo';
+}
+
+/**
  * プロバイダー設定のユニオン型
  */
-export type ProviderConfig = SelfHostedWhisperConfig | OpenAIConfig;
+export type ProviderConfig = SelfHostedWhisperConfig | OpenAIConfig | GroqConfig;
 

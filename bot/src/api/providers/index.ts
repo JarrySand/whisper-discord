@@ -3,6 +3,7 @@
  */
 export { SelfHostedWhisperProvider, LocalWhisperProvider } from './local-whisper-provider.js';
 export { OpenAIProvider } from './openai-provider.js';
+export { GroqProvider } from './groq-provider.js';
 
 export * from '../transcription-provider.js';
 
@@ -13,6 +14,7 @@ import type {
 } from '../transcription-provider.js';
 import { SelfHostedWhisperProvider } from './local-whisper-provider.js';
 import { OpenAIProvider } from './openai-provider.js';
+import { GroqProvider } from './groq-provider.js';
 
 /**
  * プロバイダーファクトリー
@@ -29,6 +31,10 @@ export function createProvider(config: ProviderConfig): TranscriptionProvider {
       logger.info('Creating OpenAIProvider');
       return new OpenAIProvider(config);
 
+    case 'groq':
+      logger.info('Creating GroqProvider');
+      return new GroqProvider(config);
+
     default:
       throw new Error(`Unknown provider type: ${(config as ProviderConfig).type}`);
   }
@@ -40,11 +46,21 @@ export function createProvider(config: ProviderConfig): TranscriptionProvider {
  * TRANSCRIPTION_PROVIDER の値:
  *   - "self-hosted" または "local": セルフホスト Whisper API (ローカルまたは外部サーバー)
  *   - "openai": OpenAI Whisper API
+ *   - "groq": Groq Whisper API (whisper-large-v3, 超高速)
  */
 export function createProviderFromEnv(): TranscriptionProvider {
   const providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
 
   switch (providerType) {
+    case 'groq': {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) {
+        throw new Error('GROQ_API_KEY is required for Groq provider');
+      }
+      const model = (process.env.GROQ_MODEL as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
+      return new GroqProvider({ apiKey, model });
+    }
+
     case 'openai': {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
