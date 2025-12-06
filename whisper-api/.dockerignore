@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Local files
+*.log
+*.tmp
+
+# Temporary files (will be mounted as volume)
+temp/*
+!temp/.gitkeep
+
+# Models (will be mounted as volume)
+models/*
+!models/.gitkeep
+
+# Development
+requirements-dev.txt
+tests/
+

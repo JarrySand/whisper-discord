@@ -1,0 +1,93 @@
+# =============================================================================
+# Whisper API Server Docker Compose
+# =============================================================================
+# Usage:
+#   CPU:  docker-compose up -d
+#   GPU:  docker-compose --profile gpu up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # CPU Version (default)
+  # ===========================================================================
+  whisper-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whisper-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./temp:/app/temp
+    environment:
+      - WHISPER_MODEL_NAME=large-v3
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - WHISPER_BEAM_SIZE=1
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 12G
+        reservations:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # ===========================================================================
+  # GPU Version (use with --profile gpu)
+  # ===========================================================================
+  whisper-api-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: whisper-api-gpu
+    profiles:
+      - gpu
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./temp:/app/temp
+    environment:
+      - WHISPER_MODEL_NAME=large-v3
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE_TYPE=float16
+      - WHISPER_BEAM_SIZE=5
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  models:
+    driver: local
+  temp:
+    driver: local
+

@@ -1,0 +1,111 @@
+# =============================================================================
+# Docker Compose for Cloud Deployment (Groq/OpenAI Mode)
+# =============================================================================
+# 無料サーバー向けの軽量構成（ローカルモデル不使用）
+#
+# Usage:
+#   docker-compose -f docker-compose.cloud.yml up -d
+#
+# 必要な環境変数:
+#   - DISCORD_BOT_TOKEN
+#   - DISCORD_CLIENT_ID
+#   - WHISPER_PROVIDER (groq or openai)
+#   - WHISPER_GROQ_API_KEY (Groq使用時)
+#   - WHISPER_OPENAI_API_KEY (OpenAI使用時)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Discord Bot
+  # ===========================================================================
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: whisper-discord-bot
+    restart: unless-stopped
+    depends_on:
+      whisper-api:
+        condition: service_healthy
+    environment:
+      # Discord設定
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      # Whisper API接続
+      - WHISPER_API_URL=http://whisper-api:8000
+      - WHISPER_API_TIMEOUT=60000
+      # 音声処理
+      - AUDIO_SILENCE_THRESHOLD=800
+      - AUDIO_MAX_SEGMENT_DURATION=8000
+      - AUDIO_MIN_SEGMENT_DURATION=1000
+      - AUDIO_MIN_RMS_THRESHOLD=0.005
+      # 出力設定
+      - OUTPUT_LOG_DIR=/app/logs
+      - OUTPUT_ENABLE_DISCORD_POST=true
+      - OUTPUT_ENABLE_FILE_LOG=true
+      - OUTPUT_ENABLE_JSON_STORE=true
+      - OUTPUT_ENABLE_MARKDOWN=true
+      - LOG_LEVEL=info
+    volumes:
+      - bot-logs:/app/logs
+      - bot-data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ===========================================================================
+  # Whisper API (Cloud Provider Mode - Lightweight)
+  # ===========================================================================
+  whisper-api:
+    build:
+      context: ./whisper-api
+      dockerfile: Dockerfile
+    container_name: whisper-api
+    restart: unless-stopped
+    environment:
+      # プロバイダー設定（groq or openai）
+      - WHISPER_PROVIDER=${WHISPER_PROVIDER:-groq}
+      # Groq API
+      - WHISPER_GROQ_API_KEY=${WHISPER_GROQ_API_KEY:-}
+      - WHISPER_GROQ_MODEL=${WHISPER_GROQ_MODEL:-whisper-large-v3}
+      # OpenAI API
+      - WHISPER_OPENAI_API_KEY=${WHISPER_OPENAI_API_KEY:-}
+      - WHISPER_OPENAI_MODEL=${WHISPER_OPENAI_MODEL:-whisper-1}
+      # サーバー設定
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - SERVER_TEMP_DIR=/app/temp
+      - LOG_LEVEL=INFO
+    volumes:
+      - whisper-temp:/app/temp
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  bot-logs:
+    driver: local
+  bot-data:
+    driver: local
+  whisper-temp:
+    driver: local
+

@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Audio segments
+segments/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+

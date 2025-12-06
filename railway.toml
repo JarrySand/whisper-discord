@@ -1,0 +1,18 @@
+# =============================================================================
+# Railway Configuration
+# =============================================================================
+# このファイルは Railway へのデプロイ設定です。
+# 
+# Railway では複数サービスを1つのリポジトリからデプロイできます。
+# Bot と Whisper API を別々のサービスとしてデプロイします。
+# =============================================================================
+
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
