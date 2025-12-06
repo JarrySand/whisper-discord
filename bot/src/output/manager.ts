@@ -230,6 +230,12 @@ export class OutputManager {
    * 文字起こし結果を出力
    */
   async output(result: TranscriptionResult): Promise<void> {
+    logger.debug('OutputManager.output called', {
+      isSessionActive: this.isSessionActive,
+      hasDiscord: !!this.discord,
+      text: result.text.substring(0, 50),
+    });
+
     if (!this.isSessionActive) {
       logger.warn('OutputManager session not active');
       return;
@@ -239,11 +245,14 @@ export class OutputManager {
 
     // Discord出力
     if (this.discord) {
+      logger.info('Posting to Discord', { text: result.text.substring(0, 30) });
       promises.push(
         this.discord.post(result).catch((err) => {
           logger.error('Discord output failed', { error: err });
         })
       );
+    } else {
+      logger.warn('Discord service not available');
     }
 
     // ファイルログ出力

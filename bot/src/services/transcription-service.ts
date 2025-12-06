@@ -102,11 +102,18 @@ export class TranscriptionService extends EventEmitter {
   private setupEventHandlers(): void {
     // キュー完了イベント
     this.queue.on('completed', (item, result) => {
+      logger.debug('Queue completed event received', {
+        segmentId: item.id,
+        success: result.success,
+        hasData: !!result.data,
+        text: result.data?.text?.substring(0, 100),
+      });
+
       if (result.success && result.data) {
         // 空結果をスキップ（品質向上: QUALITY_IMPROVEMENT.md Phase 1.3）
         let text = result.data.text?.trim() ?? '';
         if (!text) {
-          logger.debug('Skipping empty transcription result', {
+          logger.info('Skipping empty transcription result', {
             segmentId: item.id,
             userId: result.data.user_id,
             username: result.data.username,
@@ -119,7 +126,7 @@ export class TranscriptionService extends EventEmitter {
         // ハルシネーションフィルター適用
         const hallucinationResult = this.hallucinationFilter.filter(text);
         if (hallucinationResult.wasFiltered) {
-          logger.debug('Hallucination filtered', {
+          logger.info('Hallucination filtered', {
             segmentId: item.id,
             reason: hallucinationResult.reason,
             originalText: text.substring(0, 50),
@@ -129,7 +136,7 @@ export class TranscriptionService extends EventEmitter {
 
         // 相槌フィルター適用
         if (this.aizuchiFilter.isAizuchi(text)) {
-          logger.debug('Aizuchi filtered', {
+          logger.info('Aizuchi filtered', {
             segmentId: item.id,
             text: text,
           });
@@ -174,9 +181,16 @@ export class TranscriptionService extends EventEmitter {
 
         // 出力マネージャーに送信
         if (this.outputManager) {
+          logger.info('Sending to OutputManager', {
+            segmentId: transcriptionResult.segmentId,
+            text: transcriptionResult.text.substring(0, 50),
+            displayName: transcriptionResult.displayName,
+          });
           this.outputManager.output(transcriptionResult).catch((err) => {
             logger.error('Output failed', { error: err });
           });
+        } else {
+          logger.warn('OutputManager is null, skipping output');
         }
 
         this.emit('transcribed', transcriptionResult);
