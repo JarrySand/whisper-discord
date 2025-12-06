@@ -11,7 +11,7 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# Install build tools for native modules (@discordjs/opus)
+# Install build tools for native modules (@discordjs/opus, sodium-native)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libtool \
     autoconf \
     automake \
+    libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -50,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libtool \
     autoconf \
     automake \
+    libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
