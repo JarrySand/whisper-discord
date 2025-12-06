@@ -139,7 +139,12 @@ export class VoiceReceiverHandler extends EventEmitter {
     });
 
     opusStream.on('error', (error: Error) => {
-      logger.error(`Opus stream error for user ${userId}:`, error);
+      // DAVE/E2EE 関連エラーは警告レベルで処理（一部のユーザーで発生するが致命的ではない）
+      if (error.message.includes('decrypt') || error.message.includes('Decryption')) {
+        logger.warn(`DAVE encryption error for user ${userId} - audio may not be captured`);
+      } else {
+        logger.error(`Opus stream error for user ${userId}:`, error);
+      }
       this.activeStreams.delete(userId);
       this.cleanupDecoder(userId);
     });
