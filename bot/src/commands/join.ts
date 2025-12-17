@@ -4,6 +4,7 @@ import {
   ChannelType,
   GuildMember,
   TextChannel,
+  PermissionFlagsBits,
 } from 'discord.js';
 import {
   joinVoiceChannel,
@@ -113,6 +114,21 @@ export const joinCommand: Command = {
     if (connectionManager.hasConnection(guild.id)) {
       await interaction.editReply('❌ すでにボイスチャンネルに参加しています');
       return;
+    }
+
+    // 権限チェック: ボイスチャンネルへの接続・発言権限を確認
+    const botMember = guild.members.cache.get(interaction.client.user!.id);
+    const resolvedChannel = guild.channels.cache.get(voiceChannel.id);
+    if (botMember && resolvedChannel?.isVoiceBased()) {
+      const permissions = resolvedChannel.permissionsFor(botMember);
+      if (!permissions?.has(PermissionFlagsBits.Connect)) {
+        await interaction.editReply('❌ ボイスチャンネルに接続する権限がありません');
+        return;
+      }
+      if (!permissions?.has(PermissionFlagsBits.Speak)) {
+        await interaction.editReply('❌ ボイスチャンネルで発言する権限がありません');
+        return;
+      }
     }
 
     try {

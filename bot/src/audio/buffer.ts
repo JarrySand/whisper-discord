@@ -12,6 +12,9 @@ export class AudioBufferManager {
   private readonly maxBufferDuration: number;
   private readonly silenceThreshold: number;
   
+  // メモリ保護: 同時バッファ数の上限
+  private readonly MAX_CONCURRENT_BUFFERS = 50;
+  
   // フラッシュ中フラグ（重複フラッシュ防止）
   private flushingUsers = new Set<string>();
 
@@ -40,6 +43,12 @@ export class AudioBufferManager {
     displayName: string,
     data: Buffer
   ): void {
+    // メモリ保護: 新規ユーザーのバッファ作成を制限
+    if (this.buffers.size >= this.MAX_CONCURRENT_BUFFERS && !this.buffers.has(userId)) {
+      logger.warn(`Max concurrent buffers (${this.MAX_CONCURRENT_BUFFERS}) reached, ignoring new user: ${username}`);
+      return;
+    }
+    
     const buffer = this.getOrCreateBuffer(userId, username, displayName);
     const now = Date.now();
 

@@ -96,9 +96,20 @@ class GuildSettingsManager {
   }
 
   /**
+   * guildId のバリデーション（パストラバーサル対策）
+   */
+  private validateGuildId(guildId: string): void {
+    // Discord Snowflake は数字のみ
+    if (!/^\d+$/.test(guildId)) {
+      throw new Error(`Invalid guild ID format: ${guildId}`);
+    }
+  }
+
+  /**
    * サーバー設定を取得
    */
   getSettings(guildId: string): GuildSettings | undefined {
+    this.validateGuildId(guildId);
     return this.settings.guilds[guildId];
   }
 
@@ -106,6 +117,7 @@ class GuildSettingsManager {
    * デフォルト出力チャンネルを取得
    */
   getDefaultOutputChannel(guildId: string): { channelId: string; channelName?: string } | undefined {
+    this.validateGuildId(guildId);
     const settings = this.settings.guilds[guildId];
     if (settings?.defaultOutputChannelId) {
       return {
@@ -125,6 +137,7 @@ class GuildSettingsManager {
     channelName?: string,
     guildName?: string
   ): void {
+    this.validateGuildId(guildId);
     if (!this.settings.guilds[guildId]) {
       this.settings.guilds[guildId] = {
         guildId,

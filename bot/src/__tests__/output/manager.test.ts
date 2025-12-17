@@ -278,6 +278,10 @@ describe('OutputManager', () => {
 
   describe('SQLiteストア', () => {
     test('SQLite有効時にストアが初期化される', async () => {
+      // SqliteStoreManager を動的インポート
+      const { SqliteStoreManager } = await import('../../output/sqlite-store.js');
+      const storeManager = new SqliteStoreManager(TEST_DATA_DIR, 30);
+      
       const sqliteManager = new OutputManager({
         discord: { enabled: false, config: {} },
         fileLog: { enabled: false, config: {} },
@@ -289,16 +293,20 @@ describe('OutputManager', () => {
         },
       });
 
+      // 外部からSqliteStoreManagerを設定
+      sqliteManager.setSqliteStoreManager(storeManager);
+
       await sqliteManager.startSession({
-        guildId: 'guild-1',
+        guildId: '123456789012345678',
         guildName: 'Test Guild',
-        channelId: 'channel-1',
+        channelId: '111111111111111111',
         channelName: 'general',
       });
 
       expect(sqliteManager.getSqliteStore()).not.toBeNull();
 
       await sqliteManager.endSession();
+      storeManager.closeAll();
 
       // クリーンアップ
       try {

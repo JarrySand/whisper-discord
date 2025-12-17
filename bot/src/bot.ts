@@ -24,6 +24,10 @@ export class Bot {
   public readonly commands: Collection<string, Command>;
   private isReady = false;
   private sqliteStoreManager: SqliteStoreManager | null = null;
+  
+  // レート制限: ユーザーごとのクールダウン管理
+  private commandCooldowns = new Map<string, Map<string, number>>();
+  private readonly COOLDOWN_MS = 5000; // 5秒クールダウン
 
   constructor() {
     this.client = new Client({
@@ -89,6 +93,31 @@ export class Bot {
         logger.warn(`Unknown command: ${interaction.commandName}`);
         return;
       }
+
+      // レート制限チェック
+      const now = Date.now();
+      
+      if (!this.commandCooldowns.has(interaction.commandName)) {
+        this.commandCooldowns.set(interaction.commandName, new Map());
+      }
+      const timestamps = this.commandCooldowns.get(interaction.commandName)!;
+      
+      if (timestamps.has(interaction.user.id)) {
+        const expirationTime = timestamps.get(interaction.user.id)! + this.COOLDOWN_MS;
+        if (now < expirationTime) {
+          const remaining = Math.ceil((expirationTime - now) / 1000);
+          await interaction.reply({
+            content: `⏱️ このコマンドは${remaining}秒後に再実行できます`,
+            ephemeral: true,
+          });
+          return;
+        }
+      }
+      
+      timestamps.set(interaction.user.id, now);
+      
+      // 古いエントリをクリーンアップ（メモリリーク防止）
+      setTimeout(() => timestamps.delete(interaction.user.id), this.COOLDOWN_MS);
 
       try {
         logger.info(

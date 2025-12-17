@@ -92,6 +92,16 @@ export const searchCommand: Command = {
     }
 
     const keyword = interaction.options.getString('keyword', true);
+    
+    // ReDoS 対策: キーワード長を制限
+    if (keyword.length > 100) {
+      await interaction.reply({
+        content: '❌ 検索キーワードは100文字以内にしてください。',
+        ephemeral: true,
+      });
+      return;
+    }
+    
     const user = interaction.options.getUser('user');
     const limit = interaction.options.getInteger('limit') || 10;
     const guildId = interaction.guildId;
