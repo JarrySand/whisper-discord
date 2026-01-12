@@ -14,7 +14,7 @@ import { commands, setSqliteStoreManager } from './commands/index.js';
 import { connectionManager } from './voice/connection.js';
 import { guildSettings } from './services/guild-settings.js';
 import { guildApiKeys } from './services/guild-api-keys.js';
-import { guildHotwords } from './services/guild-hotwords.js';
+import { guildPrompts } from './services/guild-prompt.js';
 // SQLite は条件付きで動的インポート（メモリ節約）
 type SqliteStoreManager = import('./output/sqlite-store.js').SqliteStoreManager;
 
@@ -208,8 +208,8 @@ export class Bot {
       // Guild別APIキー設定を初期化
       await guildApiKeys.initialize();
 
-      // Guild別ホットワード設定を初期化
-      await guildHotwords.initialize();
+      // Guild別プロンプト設定を初期化
+      await guildPrompts.initialize();
 
       await this.client.login(botConfig.token);
     } catch (error) {
@@ -233,8 +233,8 @@ export class Bot {
     // Guild別APIキー設定を保存
     await guildApiKeys.save();
 
-    // Guild別ホットワード設定を保存
-    await guildHotwords.save();
+    // Guild別プロンプト設定を保存
+    await guildPrompts.save();
 
     // SQLite ストアマネージャーを閉じる
     if (this.sqliteStoreManager) {

@@ -25,7 +25,7 @@ import type {
   TranscriptionResult,
   OutputManagerConfig,
 } from '../types/index.js';
-import { guildHotwords } from './guild-hotwords.js';
+import { guildPrompts } from './guild-prompt.js';
 
 /**
  * 拡張セッションコンテキスト（出力チャンネル情報を含む）
@@ -64,9 +64,9 @@ export class TranscriptionService extends EventEmitter {
   constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}, guildId?: string) {
     super();
 
-    // ホットワード取得関数（guildIdがある場合のみ）
-    const hotwordsProvider = guildId
-      ? () => guildHotwords.getMergedHotwords(guildId)
+    // プロンプト取得関数（guildIdがある場合のみ）
+    const promptProvider = guildId
+      ? () => guildPrompts.getPrompt(guildId)
       : null;
 
     // コンポーネント初期化（Guild別APIキー対応）
@@ -77,7 +77,7 @@ export class TranscriptionService extends EventEmitter {
       this.whisperClient,
       config.queue,
       this.circuitBreaker,
-      hotwordsProvider
+      promptProvider
     );
     this.offlineHandler = new OfflineHandler(config.offline);
     this.metricsCollector = new MetricsCollector();

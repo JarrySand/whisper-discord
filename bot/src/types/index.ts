@@ -180,7 +180,7 @@ export interface TranscribeRequest {
   startTs: number;
   endTs: number;
   language?: string;
-  hotwords?: string[];
+  prompt?: string;
 }
 
 /**

@@ -18,8 +18,8 @@ export interface TranscriptionRequest {
   displayName?: string;
   startTs?: number;
   endTs?: number;
-  // ホットワード（Self-hostedプロバイダーのみ対応）
-  hotwords?: string[];
+  // Whisperプロンプト（文脈や専門用語を指定）
+  prompt?: string;
 }
 
 /**

@@ -93,12 +93,9 @@ export class GroqProvider implements TranscriptionProvider {
         formData.append('language', request.language);
       }
 
-      // ホットワード（promptパラメータで渡す）
-      if (request.hotwords && request.hotwords.length > 0) {
-        const prompt = request.language === 'ja'
-          ? `これは日本語の会話です。用語: ${request.hotwords.join(', ')}`
-          : request.hotwords.join(', ');
-        formData.append('prompt', prompt);
+      // プロンプト（文脈や専門用語を指定）
+      if (request.prompt) {
+        formData.append('prompt', request.prompt);
       }
 
       // レスポンス形式

@@ -91,7 +91,7 @@ export class WhisperClient {
       language: request.language ?? 'ja',
       userId: request.userId,
       username: request.username,
-      hotwords: request.hotwords,
+      prompt: request.prompt,
     };
 
     const startTime = Date.now();
@@ -151,9 +151,9 @@ export class WhisperClient {
     formData.append('end_ts', request.endTs.toString());
     formData.append('language', request.language ?? 'ja');
 
-    // ホットワード
-    if (request.hotwords && request.hotwords.length > 0) {
-      formData.append('hotwords', request.hotwords.join(','));
+    // プロンプト
+    if (request.prompt) {
+      formData.append('prompt', request.prompt);
     }
 
     return this.executeWithRetry(async () => {

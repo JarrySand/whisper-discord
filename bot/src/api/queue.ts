@@ -17,9 +17,9 @@ import type {
 } from '../types/index.js';
 
 /**
- * ホットワード取得関数の型
+ * プロンプト取得関数の型
  */
-export type HotwordsProvider = () => string[];
+export type PromptProvider = () => string | null;
 
 /**
  * 文字起こしキュー
@@ -30,7 +30,7 @@ export class TranscriptionQueue extends EventEmitter {
   private config: QueueConfig;
   private whisperClient: WhisperClient;
   private circuitBreaker: CircuitBreaker | null;
-  private hotwordsProvider: HotwordsProvider | null;
+  private promptProvider: PromptProvider | null;
   private isRunning = false;
 
   // レート制限対策: 最後のリクエスト時刻
@@ -41,12 +41,12 @@ export class TranscriptionQueue extends EventEmitter {
     whisperClient: WhisperClient,
     config: Partial<QueueConfig> = {},
     circuitBreaker: CircuitBreaker | null = null,
-    hotwordsProvider: HotwordsProvider | null = null
+    promptProvider: PromptProvider | null = null
   ) {
     super();
     this.whisperClient = whisperClient;
     this.circuitBreaker = circuitBreaker;
-    this.hotwordsProvider = hotwordsProvider;
+    this.promptProvider = promptProvider;
     this.config = {
       maxSize: config.maxSize ?? 100,
       maxRetries: config.maxRetries ?? 3,
@@ -173,8 +173,8 @@ export class TranscriptionQueue extends EventEmitter {
       );
     });
 
-    // ホットワードを取得
-    const hotwords = this.hotwordsProvider ? this.hotwordsProvider() : undefined;
+    // プロンプトを取得
+    const prompt = this.promptProvider ? this.promptProvider() : undefined;
 
     // サーキットブレーカー経由で実行
     const transcribeOperation = async (): Promise<TranscribeResponse> => {
@@ -186,7 +186,7 @@ export class TranscriptionQueue extends EventEmitter {
         displayName: item.segment.displayName,
         startTs: item.segment.startTimestamp,
         endTs: item.segment.endTimestamp,
-        hotwords,
+        prompt: prompt ?? undefined,
       });
     };
 
