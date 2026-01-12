@@ -17,6 +17,7 @@ import { connectionManager } from '../voice/connection.js';
 import { VoiceReceiverHandler } from '../voice/receiver.js';
 import { TranscriptionService } from '../services/transcription-service.js';
 import { guildSettings } from '../services/guild-settings.js';
+import { guildApiKeys } from '../services/guild-api-keys.js';
 import { getSqliteStoreManager } from './index.js';
 
 export const joinCommand: Command = {
@@ -44,6 +45,22 @@ export const joinCommand: Command = {
     const guild = interaction.guild;
     if (!guild) {
       await interaction.editReply('❌ このコマンドはサーバー内でのみ使用できます');
+      return;
+    }
+
+    // Guild APIキーが設定されているかチェック
+    if (!guildApiKeys.hasApiKey(guild.id)) {
+      await interaction.editReply(
+        '❌ **APIキーが設定されていません**\n\n' +
+        '文字起こしを使用するには、サーバー管理者がAPIキーを設定する必要があります。\n\n' +
+        '**設定方法:**\n' +
+        '```\n' +
+        '/apikey set provider:Groq api_key:gsk_xxxxx\n' +
+        '```\n\n' +
+        '**APIキーの取得:**\n' +
+        '• Groq（推奨）: https://console.groq.com/\n' +
+        '• OpenAI: https://platform.openai.com/'
+      );
       return;
     }
 

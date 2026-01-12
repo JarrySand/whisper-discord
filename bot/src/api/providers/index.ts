@@ -42,85 +42,44 @@ export function createProvider(config: ProviderConfig): TranscriptionProvider {
 }
 
 /**
- * 環境変数からプロバイダーを生成
- *
- * TRANSCRIPTION_PROVIDER の値:
- *   - "self-hosted" または "local": セルフホスト Whisper API (ローカルまたは外部サーバー)
- *   - "openai": OpenAI Whisper API
- *   - "groq": Groq Whisper API (whisper-large-v3, 超高速)
- */
-export function createProviderFromEnv(): TranscriptionProvider {
-  const providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
-
-  switch (providerType) {
-    case 'groq': {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) {
-        throw new Error('GROQ_API_KEY is required for Groq provider');
-      }
-      const model = (process.env.GROQ_MODEL as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
-      return new GroqProvider({ apiKey, model });
-    }
-
-    case 'openai': {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is required for OpenAI provider');
-      }
-      return new OpenAIProvider({ apiKey });
-    }
-
-    case 'self-hosted':
-    case 'local': // 後方互換性のため
-    default:
-      return new SelfHostedWhisperProvider({
-        baseUrl: process.env.WHISPER_API_URL ?? 'http://localhost:8000',
-      });
-  }
-}
-
-/**
  * Guild別プロバイダーを生成
  *
- * 1. Guild固有のAPIキー設定を確認
- * 2. 設定がある場合はGuild固有のプロバイダーを生成
- * 3. 設定がない場合は環境変数からプロバイダーを生成（フォールバック）
+ * Guild固有のAPIキー設定からプロバイダーを生成
+ * 設定がない場合はエラーをスロー（/apikey コマンドでの設定が必須）
  *
  * @param guildId サーバーID
  * @returns 文字起こしプロバイダー
+ * @throws Error APIキーが設定されていない場合
  */
 export function createProviderForGuild(guildId: string): TranscriptionProvider {
   const guildConfig = guildApiKeys.getApiKeyConfig(guildId);
 
-  if (guildConfig) {
-    logger.info(`Using guild-specific provider for ${guildId}: ${guildConfig.provider}`);
-
-    switch (guildConfig.provider) {
-      case 'groq': {
-        if (!guildConfig.apiKey) {
-          throw new Error(`Groq API key not found for guild ${guildId}`);
-        }
-        const model = (guildConfig.model as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
-        return new GroqProvider({ apiKey: guildConfig.apiKey, model });
-      }
-
-      case 'openai': {
-        if (!guildConfig.apiKey) {
-          throw new Error(`OpenAI API key not found for guild ${guildId}`);
-        }
-        return new OpenAIProvider({ apiKey: guildConfig.apiKey });
-      }
-
-      case 'self-hosted':
-      default:
-        return new SelfHostedWhisperProvider({
-          baseUrl: guildConfig.selfHostedUrl ?? process.env.WHISPER_API_URL ?? 'http://localhost:8000',
-        });
-    }
+  if (!guildConfig) {
+    throw new Error(`API key not configured for guild ${guildId}. Use /apikey set command to configure.`);
   }
 
-  // Guild固有の設定がない場合は環境変数から生成（フォールバック）
-  logger.info(`Using default provider for guild ${guildId}`);
-  return createProviderFromEnv();
-}
+  logger.info(`Using guild-specific provider for ${guildId}: ${guildConfig.provider}`);
 
+  switch (guildConfig.provider) {
+    case 'groq': {
+      if (!guildConfig.apiKey) {
+        throw new Error(`Groq API key not found for guild ${guildId}`);
+      }
+      const model = (guildConfig.model as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
+      return new GroqProvider({ apiKey: guildConfig.apiKey, model });
+    }
+
+    case 'openai': {
+      if (!guildConfig.apiKey) {
+        throw new Error(`OpenAI API key not found for guild ${guildId}`);
+      }
+      return new OpenAIProvider({ apiKey: guildConfig.apiKey });
+    }
+
+    case 'self-hosted':
+    default:
+      return new SelfHostedWhisperProvider({
+        baseUrl: guildConfig.selfHostedUrl ?? 'http://localhost:8000',
+      });
+  }
+}
