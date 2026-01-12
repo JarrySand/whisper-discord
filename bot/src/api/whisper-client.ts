@@ -7,7 +7,7 @@ import axios, { AxiosInstance, isAxiosError } from 'axios';
 import FormData from 'form-data';
 import { logger } from '../utils/logger.js';
 import { botConfig } from '../config/index.js';
-import { createProviderFromEnv } from './providers/index.js';
+import { createProviderFromEnv, createProviderForGuild } from './providers/index.js';
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
@@ -38,9 +38,9 @@ export class WhisperClient {
   private provider: TranscriptionProvider | null = null;
   private providerType: string;
 
-  constructor(config: Partial<WhisperClientConfig> = {}) {
+  constructor(config: Partial<WhisperClientConfig> = {}, guildId?: string) {
     this.providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
-    
+
     this.config = {
       baseUrl: config.baseUrl ?? botConfig.whisper.apiUrl,
       timeout: config.timeout ?? botConfig.whisper.timeout,
@@ -49,9 +49,13 @@ export class WhisperClient {
       retryBackoffMultiplier: config.retryBackoffMultiplier ?? 2,
     };
 
-    // プロバイダータイプに応じて初期化
-    if (this.providerType === 'groq' || this.providerType === 'openai') {
-      // クラウドプロバイダーを使用
+    // Guild別プロバイダーを使用（guildIdが指定されている場合）
+    if (guildId) {
+      this.provider = createProviderForGuild(guildId);
+      this.providerType = this.provider.constructor.name.replace('Provider', '').toLowerCase();
+      logger.info(`WhisperClient initialized with guild-specific provider for ${guildId}: ${this.providerType}`);
+    } else if (this.providerType === 'groq' || this.providerType === 'openai') {
+      // guildIdがない場合は環境変数から判断
       this.provider = createProviderFromEnv();
       logger.info(`WhisperClient initialized with ${this.providerType} provider`);
     } else {

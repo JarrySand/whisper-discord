@@ -4,7 +4,6 @@ import {
   ChannelType,
   GuildMember,
   TextChannel,
-  PermissionFlagsBits,
 } from 'discord.js';
 import {
   joinVoiceChannel,
@@ -116,21 +115,6 @@ export const joinCommand: Command = {
       return;
     }
 
-    // 権限チェック: ボイスチャンネルへの接続・発言権限を確認
-    const botMember = guild.members.cache.get(interaction.client.user!.id);
-    const resolvedChannel = guild.channels.cache.get(voiceChannel.id);
-    if (botMember && resolvedChannel?.isVoiceBased()) {
-      const permissions = resolvedChannel.permissionsFor(botMember);
-      if (!permissions?.has(PermissionFlagsBits.Connect)) {
-        await interaction.editReply('❌ ボイスチャンネルに接続する権限がありません');
-        return;
-      }
-      if (!permissions?.has(PermissionFlagsBits.Speak)) {
-        await interaction.editReply('❌ ボイスチャンネルで発言する権限がありません');
-        return;
-      }
-    }
-
     try {
       // ボイスチャンネルに参加
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
@@ -165,7 +149,7 @@ export const joinCommand: Command = {
       const receiverHandler = new VoiceReceiverHandler(connection, guild);
       connectionManager.setReceiverHandler(guild.id, receiverHandler);
 
-      // 文字起こしサービスを初期化
+      // 文字起こしサービスを初期化（Guild別APIキー対応）
       const transcriptionService = new TranscriptionService({
         whisper: {
           baseUrl: botConfig.whisper.apiUrl,
@@ -207,7 +191,7 @@ export const joinCommand: Command = {
             },
           },
         },
-      });
+      }, guild.id);
 
       // bot.tsのSqliteStoreManagerをOutputManagerに共有（検索機能と同一インスタンスを使用）
       const sharedSqliteManager = getSqliteStoreManager();

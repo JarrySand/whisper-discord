@@ -60,11 +60,11 @@ export class TranscriptionService extends EventEmitter {
   private aizuchiFilter: AizuchiFilter;
   private hallucinationFilter: HallucinationFilter;
 
-  constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}) {
+  constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}, guildId?: string) {
     super();
 
-    // コンポーネント初期化
-    this.whisperClient = new WhisperClient(config.whisper);
+    // コンポーネント初期化（Guild別APIキー対応）
+    this.whisperClient = new WhisperClient(config.whisper, guildId);
     this.circuitBreaker = new CircuitBreaker(config.circuitBreaker);
     this.healthMonitor = new HealthMonitor(this.whisperClient, config.healthMonitor);
     this.queue = new TranscriptionQueue(

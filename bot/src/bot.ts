@@ -13,6 +13,7 @@ import type { Command } from './types/index.js';
 import { commands, setSqliteStoreManager } from './commands/index.js';
 import { connectionManager } from './voice/connection.js';
 import { guildSettings } from './services/guild-settings.js';
+import { guildApiKeys } from './services/guild-api-keys.js';
 // SQLite は条件付きで動的インポート（メモリ節約）
 type SqliteStoreManager = import('./output/sqlite-store.js').SqliteStoreManager;
 
@@ -24,10 +25,6 @@ export class Bot {
   public readonly commands: Collection<string, Command>;
   private isReady = false;
   private sqliteStoreManager: SqliteStoreManager | null = null;
-  
-  // レート制限: ユーザーごとのクールダウン管理
-  private commandCooldowns = new Map<string, Map<string, number>>();
-  private readonly COOLDOWN_MS = 5000; // 5秒クールダウン
 
   constructor() {
     this.client = new Client({
@@ -93,31 +90,6 @@ export class Bot {
         logger.warn(`Unknown command: ${interaction.commandName}`);
         return;
       }
-
-      // レート制限チェック
-      const now = Date.now();
-      
-      if (!this.commandCooldowns.has(interaction.commandName)) {
-        this.commandCooldowns.set(interaction.commandName, new Map());
-      }
-      const timestamps = this.commandCooldowns.get(interaction.commandName)!;
-      
-      if (timestamps.has(interaction.user.id)) {
-        const expirationTime = timestamps.get(interaction.user.id)! + this.COOLDOWN_MS;
-        if (now < expirationTime) {
-          const remaining = Math.ceil((expirationTime - now) / 1000);
-          await interaction.reply({
-            content: `⏱️ このコマンドは${remaining}秒後に再実行できます`,
-            ephemeral: true,
-          });
-          return;
-        }
-      }
-      
-      timestamps.set(interaction.user.id, now);
-      
-      // 古いエントリをクリーンアップ（メモリリーク防止）
-      setTimeout(() => timestamps.delete(interaction.user.id), this.COOLDOWN_MS);
 
       try {
         logger.info(
@@ -233,7 +205,10 @@ export class Bot {
       
       // サーバー設定を初期化
       await guildSettings.initialize();
-      
+
+      // Guild別APIキー設定を初期化
+      await guildApiKeys.initialize();
+
       await this.client.login(botConfig.token);
     } catch (error) {
       logger.error('Failed to start bot:', error);
@@ -252,6 +227,9 @@ export class Bot {
 
     // サーバー設定を保存
     await guildSettings.save();
+
+    // Guild別APIキー設定を保存
+    await guildApiKeys.save();
 
     // SQLite ストアマネージャーを閉じる
     if (this.sqliteStoreManager) {
