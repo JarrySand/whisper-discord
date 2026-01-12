@@ -17,14 +17,19 @@ process.env.DISCORD_BOT_TOKEN = 'test-token-for-testing';
 
 // モック用の一時ディレクトリ
 let tempDir: string;
+let baseDir: string;
 
 describe('GuildHotwordsManager', () => {
   beforeAll(async () => {
-    // 一時ディレクトリを作成
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'guild-hotwords-test-'));
+    // 一時ディレクトリを作成（botディレクトリをシミュレート）
+    // 実装は process.cwd()/../config/hotwords.json を参照するため
+    // baseDir/bot を cwd として、baseDir/config にファイルを配置
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'guild-hotwords-test-'));
+    tempDir = path.join(baseDir, 'bot');
+    await fs.mkdir(tempDir, { recursive: true });
 
-    // デフォルトホットワードファイルを作成
-    const configDir = path.join(tempDir, 'config');
+    // デフォルトホットワードファイルを作成（../config/hotwords.json の位置）
+    const configDir = path.join(baseDir, 'config');
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(
       path.join(configDir, 'hotwords.json'),
@@ -37,7 +42,7 @@ describe('GuildHotwordsManager', () => {
 
   afterAll(async () => {
     // 一時ディレクトリを削除
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(baseDir, { recursive: true, force: true });
   });
 
   describe('ホットワードの追加と取得', () => {

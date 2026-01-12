@@ -9,6 +9,7 @@
  */
 import * as fs from 'fs/promises';
 import { OutputManager } from '../../output/manager.js';
+import { SqliteStoreManager } from '../../output/sqlite-store.js';
 import type { TranscriptionResult } from '../../types/index.js';
 import type { TextChannel } from 'discord.js';
 
@@ -278,16 +279,22 @@ describe('OutputManager', () => {
 
   describe('SQLiteストア', () => {
     test('SQLite有効時にストアが初期化される', async () => {
+      // SqliteStoreManager を作成
+      const storeManager = new SqliteStoreManager(TEST_DATA_DIR, 30);
+
       const sqliteManager = new OutputManager({
         discord: { enabled: false, config: {} },
         fileLog: { enabled: false, config: {} },
         jsonStore: { enabled: false, config: {} },
         markdown: { enabled: false, config: {} },
-        sqlite: { 
-          enabled: true, 
-          config: { dbDir: TEST_DATA_DIR, cleanupDays: 30 } 
+        sqlite: {
+          enabled: true,
+          config: { dbDir: TEST_DATA_DIR, cleanupDays: 30 }
         },
       });
+
+      // SqliteStoreManager を設定
+      sqliteManager.setSqliteStoreManager(storeManager);
 
       await sqliteManager.startSession({
         guildId: 'guild-1',
@@ -299,6 +306,7 @@ describe('OutputManager', () => {
       expect(sqliteManager.getSqliteStore()).not.toBeNull();
 
       await sqliteManager.endSession();
+      storeManager.closeAll();
 
       // クリーンアップ
       try {
