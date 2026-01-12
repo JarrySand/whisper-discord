@@ -59,7 +59,16 @@ class VoiceConnectionManager {
     const info = this.connections.get(guildId);
     if (!info) return;
 
-    logger.info(`Voice channel empty in guild ${guildId}. Auto-leaving immediately.`);
+    logger.info(`Voice channel empty in guild ${guildId}. Auto-leaving after queue drain.`);
+
+    // 処理中の文字起こしが完了するまで待機（最大30秒）
+    if (info.transcriptionService) {
+      const queueStatus = info.transcriptionService.getQueueStatus();
+      if (queueStatus.queued > 0 || queueStatus.processing > 0) {
+        logger.info(`Waiting for ${queueStatus.queued} queued + ${queueStatus.processing} processing items to complete`);
+        await info.transcriptionService.waitForQueueDrain(30000);
+      }
+    }
 
     // セッションサマリーレポートを生成して送信
     await this.sendSessionReport(guildId, info);
