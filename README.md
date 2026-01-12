@@ -38,6 +38,7 @@
 | 🎯 ユーザーごとの音声取得 | ✅ Voice Receive API で個別録音 |
 | 🎯 リアルタイム性は不要 | ✅ **さらにリアルタイム投稿も実装** |
 | 🎯 議事録化は不要 | ✅ **さらにMarkdown議事録も自動生成** |
+| 🎯 複数サーバー対応 | ✅ サーバー別APIキー管理（AES-256-GCM暗号化） |
 
 > 📄 開発経緯の詳細は [`difficulty.md`](./difficulty.md) を参照
 
@@ -165,6 +166,7 @@ npm start
 | 📝 **複数形式出力** | Discord投稿、ログファイル、JSON、Markdown |
 | 🔍 **検索機能** | 過去の発言をサーバー別に検索可能 |
 | ☁️ **複数プロバイダー対応** | ローカル/Groq/OpenAI から選択可能 |
+| 🔑 **サーバー別APIキー** | サーバーごとに異なるAPIキーを設定可能 |
 | 🧹 **相槌フィルター** | 「うん」「はい」等を自動除去 |
 | 🛡️ **ハルシネーション対策** | Whisperの幻覚を検出・除去 |
 
@@ -200,6 +202,24 @@ Bot をボイスチャンネルから退出させます。
 ### `/search keyword:検索ワード` (SQLite有効時)
 過去の発言を検索します。
 - `user:@ユーザー名` で特定ユーザーに絞り込み可能
+
+### `/apikey` (管理者のみ)
+サーバーごとにWhisper APIキーを設定します。複数サーバーで異なるAPIキーを使用可能。
+
+| サブコマンド | 説明 |
+|-------------|------|
+| `/apikey set` | APIキーを設定（Groq/OpenAI/Self-hosted） |
+| `/apikey clear` | APIキー設定を削除 |
+| `/apikey status` | 現在の設定を確認 |
+| `/apikey test` | APIキーの有効性をテスト |
+
+**使用例:**
+```
+/apikey set provider:Groq api_key:gsk_xxxxx
+/apikey set provider:Self-hosted url:http://localhost:8000
+```
+
+> 💡 サーバー管理者のみ実行可能。設定がない場合は環境変数のグローバル設定が使用されます。
 
 ## 📂 出力形式
 
@@ -470,6 +490,12 @@ OUTPUT_ENABLE_MARKDOWN=true      # Markdown保存
 # === SQLite検索（オプション）===
 ENABLE_SQLITE=false
 SQLITE_DB_DIR=./data
+
+# === 暗号化（サーバー別APIキー用）===
+# 未設定の場合はDISCORD_BOT_TOKENから派生キーを生成
+# 本番環境では以下のコマンドで生成することを推奨:
+# openssl rand -hex 32
+ENCRYPTION_KEY=
 ```
 
 ## Whisper API 設定 (`whisper-api/.env`)
