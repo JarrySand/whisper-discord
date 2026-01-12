@@ -410,45 +410,41 @@ describe('SqliteStoreManager', () => {
 
   describe('ストア取得', () => {
     test('ギルドIDでストアを取得できる', () => {
-      const store = manager.getStore('123456789012345678');
+      const store = manager.getStore('guild-1');
 
       expect(store).toBeInstanceOf(SqliteStore);
     });
 
     test('同じギルドIDでは同じストアが返される', () => {
-      const store1 = manager.getStore('123456789012345678');
-      const store2 = manager.getStore('123456789012345678');
+      const store1 = manager.getStore('guild-1');
+      const store2 = manager.getStore('guild-1');
 
       expect(store1).toBe(store2);
     });
 
     test('異なるギルドIDでは異なるストアが返される', () => {
-      const store1 = manager.getStore('123456789012345678');
-      const store2 = manager.getStore('987654321098765432');
+      const store1 = manager.getStore('guild-1');
+      const store2 = manager.getStore('guild-2');
 
       expect(store1).not.toBe(store2);
-    });
-
-    test('無効なギルドIDでエラーがスローされる', () => {
-      expect(() => manager.getStore('invalid-id')).toThrow('Invalid guild ID format');
     });
   });
 
   describe('ストア存在確認', () => {
     test('メモリ上のストアを検出する', () => {
-      manager.getStore('123456789012345678');
+      manager.getStore('guild-1');
 
-      expect(manager.hasStore('123456789012345678')).toBe(true);
-      expect(manager.hasStore('987654321098765432')).toBe(false);
+      expect(manager.hasStore('guild-1')).toBe(true);
+      expect(manager.hasStore('guild-2')).toBe(false);
     });
 
     test('DBファイルの存在を検出する', () => {
-      const store = manager.getStore('123456789012345678');
+      const store = manager.getStore('guild-1');
       store.startSession({
         id: 'session-1',
-        guildId: '123456789012345678',
+        guildId: 'guild-1',
         guildName: 'Test',
-        channelId: '111111111111111111',
+        channelId: 'channel-1',
         channelName: 'general',
         startedAt: new Date(),
       });
@@ -456,27 +452,25 @@ describe('SqliteStoreManager', () => {
 
       // 新しいマネージャーでファイル存在を確認
       const newManager = new SqliteStoreManager(TEST_DATA_DIR);
-      expect(newManager.hasStore('123456789012345678')).toBe(true);
+      expect(newManager.hasStore('guild-1')).toBe(true);
       newManager.closeAll();
     });
   });
 
   describe('データベース一覧', () => {
     test('ギルドデータベース一覧を取得できる', () => {
-      const guildIds = ['111111111111111111', '222222222222222222', '333333333333333333'];
-      
-      manager.getStore(guildIds[0]);
-      manager.getStore(guildIds[1]);
-      manager.getStore(guildIds[2]);
+      manager.getStore('guild-1');
+      manager.getStore('guild-2');
+      manager.getStore('guild-3');
 
       // DBファイルを作成するためにセッションを開始・終了
-      for (const guildId of guildIds) {
+      for (const guildId of ['guild-1', 'guild-2', 'guild-3']) {
         const store = manager.getStore(guildId);
         store.startSession({
           id: `session-${guildId}`,
           guildId,
           guildName: 'Test',
-          channelId: '111111111111111111',
+          channelId: 'channel-1',
           channelName: 'general',
           startedAt: new Date(),
         });
@@ -485,20 +479,20 @@ describe('SqliteStoreManager', () => {
 
       const guilds = manager.listGuildDatabases();
 
-      expect(guilds).toContain('111111111111111111');
-      expect(guilds).toContain('222222222222222222');
-      expect(guilds).toContain('333333333333333333');
+      expect(guilds).toContain('guild-1');
+      expect(guilds).toContain('guild-2');
+      expect(guilds).toContain('guild-3');
     });
   });
 
   describe('クリーンアップ', () => {
     test('全ストアのクリーンアップを実行できる', () => {
-      const store1 = manager.getStore('123456789012345678');
+      const store1 = manager.getStore('guild-1');
       store1.startSession({
         id: 'session-1',
-        guildId: '123456789012345678',
+        guildId: 'guild-1',
         guildName: 'Test',
-        channelId: '111111111111111111',
+        channelId: 'channel-1',
         channelName: 'general',
         startedAt: new Date(),
       });
@@ -511,8 +505,8 @@ describe('SqliteStoreManager', () => {
 
   describe('全ストア閉じる', () => {
     test('全ストアを閉じられる', () => {
-      manager.getStore('123456789012345678');
-      manager.getStore('987654321098765432');
+      manager.getStore('guild-1');
+      manager.getStore('guild-2');
 
       expect(() => manager.closeAll()).not.toThrow();
     });

@@ -4,6 +4,7 @@ import { leaveCommand } from './leave.js';
 import { statusCommand } from './status.js';
 import { searchCommand, setSqliteStoreManager, getSqliteStoreManager } from './search.js';
 import { apikeyCommand } from './apikey.js';
+import { hotwordCommand } from './hotword.js';
 
 /**
  * 利用可能なすべてのコマンド
@@ -14,7 +15,8 @@ export const commands: Command[] = [
   statusCommand,
   searchCommand,
   apikeyCommand,
+  hotwordCommand,
 ];
 
-export { joinCommand, leaveCommand, statusCommand, searchCommand, apikeyCommand, setSqliteStoreManager, getSqliteStoreManager };
+export { joinCommand, leaveCommand, statusCommand, searchCommand, apikeyCommand, hotwordCommand, setSqliteStoreManager, getSqliteStoreManager };
 

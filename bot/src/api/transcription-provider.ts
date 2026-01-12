@@ -18,6 +18,8 @@ export interface TranscriptionRequest {
   displayName?: string;
   startTs?: number;
   endTs?: number;
+  // ホットワード（Self-hostedプロバイダーのみ対応）
+  hotwords?: string[];
 }
 
 /**

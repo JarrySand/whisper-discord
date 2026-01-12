@@ -73,6 +73,11 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
       // フィルターはBot側で行うので無効化
       formData.append('filter_aizuchi', 'false');
 
+      // ホットワード（専門用語）
+      if (request.hotwords && request.hotwords.length > 0) {
+        formData.append('hotwords', request.hotwords.join(','));
+      }
+
       const response = await this.executeWithRetry(async () => {
         return await this.client.post('/transcribe', formData, {
           headers: formData.getHeaders(),

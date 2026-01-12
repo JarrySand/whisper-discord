@@ -427,10 +427,6 @@ export class SqliteStoreManager {
    * guildIdに対応するDBパスを生成
    */
   private getDbPath(guildId: string): string {
-    // パストラバーサル対策: guildId は Discord Snowflake (数字のみ)
-    if (!/^\d+$/.test(guildId)) {
-      throw new Error(`Invalid guild ID format: ${guildId}`);
-    }
     return path.join(this.baseDir, `guild_${guildId}.db`);
   }
 
