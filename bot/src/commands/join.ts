@@ -74,7 +74,7 @@ export const joinCommand: Command = {
 
     // 出力チャンネルを決定
     // 1. コマンドで指定された場合はそれを使用し、設定に保存
-    // 2. 指定されていない場合は保存された設定を使用
+    // 2. 指定されていない場合は保存された設定を使用（最初に指定したチャンネル）
     let outputChannel = interaction.options.getChannel('output_channel');
     let usedSavedSetting = false;
 
@@ -87,11 +87,13 @@ export const joinCommand: Command = {
         guild.name
       );
     } else {
-      // 保存された設定を使用
+      // 保存された設定を使用（最初に指定したチャンネルがデフォルトになる）
       const savedChannel = guildSettings.getDefaultOutputChannel(guild.id);
       if (savedChannel) {
         try {
-          const fetchedChannel = await guild.channels.fetch(savedChannel.channelId);
+          // キャッシュから取得を試み、なければAPIから取得（タイムアウト対策）
+          const fetchedChannel = guild.channels.cache.get(savedChannel.channelId)
+            ?? await guild.channels.fetch(savedChannel.channelId);
           if (fetchedChannel && fetchedChannel.type === ChannelType.GuildText) {
             outputChannel = fetchedChannel;
             usedSavedSetting = true;
@@ -99,7 +101,7 @@ export const joinCommand: Command = {
           } else {
             // チャンネルが存在しないか、テキストチャンネルでない場合は設定をクリア
             guildSettings.clearDefaultOutputChannel(guild.id);
-            logger.warn(`Saved output channel ${savedChannel.channelId} no longer valid, cleared setting`);
+            logger.warn(`Saved output channel ${savedChannel.channelId} no longer valid (type: ${fetchedChannel?.type}), cleared setting`);
           }
         } catch (error) {
           // チャンネル取得に失敗した場合は設定をクリア
@@ -129,10 +131,22 @@ export const joinCommand: Command = {
       // 接続完了を待機
       await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
-      // 出力チャンネルを取得
-      const textChannel = outputChannel
-        ? (await guild.channels.fetch(outputChannel.id)) as TextChannel
-        : undefined;
+      // 出力チャンネルをTextChannelとして取得
+      let textChannel: TextChannel | undefined;
+      if (outputChannel) {
+        if (usedSavedSetting) {
+          // 保存された設定から取得した場合は既にGuildChannel型
+          textChannel = outputChannel as TextChannel;
+        } else {
+          // コマンドで指定された場合はfetchが必要
+          textChannel = (await guild.channels.fetch(outputChannel.id)) as TextChannel;
+        }
+        logger.debug('Output channel resolved:', {
+          id: textChannel.id,
+          name: textChannel.name,
+          usedSavedSetting
+        });
+      }
 
       // 接続を管理に追加
       connectionManager.addConnection(guild.id, {
