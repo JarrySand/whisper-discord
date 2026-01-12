@@ -7,13 +7,13 @@ import { TextChannel } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { VoiceReceiverHandler } from './receiver.js';
 import { TranscriptionService } from '../services/transcription-service.js';
+import { formatDuration } from '../utils/time.js';
 
 /**
  * 自動離脱設定
  */
 export interface AutoLeaveConfig {
   enabled: boolean;
-  timeoutMs: number; // デフォルト: 10分 = 600000ms
 }
 
 /**
@@ -40,7 +40,6 @@ class VoiceConnectionManager {
   private connections = new Map<string, ConnectionInfo>();
   private autoLeaveConfig: AutoLeaveConfig = {
     enabled: true,
-    timeoutMs: 10 * 60 * 1000, // 10分
   };
 
   /**
@@ -48,38 +47,86 @@ class VoiceConnectionManager {
    */
   setAutoLeaveConfig(config: Partial<AutoLeaveConfig>): void {
     this.autoLeaveConfig = { ...this.autoLeaveConfig, ...config };
-    logger.info(`Auto-leave config updated: enabled=${this.autoLeaveConfig.enabled}, timeout=${this.autoLeaveConfig.timeoutMs}ms`);
+    logger.info(`Auto-leave config updated: enabled=${this.autoLeaveConfig.enabled}`);
   }
 
   /**
-   * 自動離脱タイマーを開始
+   * ボイスチャンネルが空になった時に即時離脱を実行
    */
-  startAutoLeaveTimer(guildId: string): void {
+  async handleEmptyChannel(guildId: string): Promise<void> {
     if (!this.autoLeaveConfig.enabled) return;
 
     const info = this.connections.get(guildId);
     if (!info) return;
 
-    // 既存のタイマーがあればクリア
-    this.cancelAutoLeaveTimer(guildId);
+    logger.info(`Voice channel empty in guild ${guildId}. Auto-leaving immediately.`);
 
-    logger.info(`Starting auto-leave timer for guild ${guildId} (${this.autoLeaveConfig.timeoutMs / 1000}s)`);
+    // セッションサマリーレポートを生成して送信
+    await this.sendSessionReport(guildId, info);
 
-    info.autoLeaveTimer = setTimeout(async () => {
-      logger.info(`Auto-leave timer expired for guild ${guildId}. Leaving voice channel.`);
-      await this.removeConnection(guildId);
-    }, this.autoLeaveConfig.timeoutMs);
+    // 接続を切断
+    await this.removeConnection(guildId);
   }
 
   /**
-   * 自動離脱タイマーをキャンセル
+   * セッション終了レポートを出力チャンネルに送信
+   */
+  private async sendSessionReport(guildId: string, info: ConnectionInfo): Promise<void> {
+    if (!info.outputChannel) {
+      logger.debug(`No output channel for guild ${guildId}, skipping session report`);
+      return;
+    }
+
+    try {
+      // セッション時間を計算
+      const sessionDuration = Date.now() - info.startedAt.getTime();
+      const formattedDuration = formatDuration(sessionDuration);
+
+      // 統計情報を取得
+      const stats = info.transcriptionService?.getStatus();
+
+      let message = `🔇 **自動退出** - ボイスチャンネルが空になりました\n`;
+      message += `📍 チャンネル: **${info.channelName}**\n`;
+      message += `⏱️ セッション時間: **${formattedDuration}**`;
+
+      // 文字起こし統計を追加
+      if (stats?.metrics) {
+        const { totalRequests, successfulRequests } = stats.metrics;
+        if (totalRequests > 0) {
+          message += `\n📊 文字起こし: **${successfulRequests}件** (成功率: ${Math.round((successfulRequests / totalRequests) * 100)}%)`;
+        }
+      }
+
+      await info.outputChannel.send(message);
+
+      logger.info(`Session report sent for guild ${guildId}`, {
+        channelName: info.channelName,
+        duration: formattedDuration,
+      });
+    } catch (error) {
+      logger.error(`Failed to send session report for guild ${guildId}`, { error });
+    }
+  }
+
+  /**
+   * 自動離脱タイマーを開始（後方互換性のため維持、即時実行）
+   * @deprecated Use handleEmptyChannel instead
+   */
+  startAutoLeaveTimer(guildId: string): void {
+    // 即時実行に変更
+    this.handleEmptyChannel(guildId);
+  }
+
+  /**
+   * 自動離脱タイマーをキャンセル（後方互換性のため維持）
+   * @deprecated No longer needed with immediate auto-leave
    */
   cancelAutoLeaveTimer(guildId: string): void {
     const info = this.connections.get(guildId);
     if (info?.autoLeaveTimer) {
       clearTimeout(info.autoLeaveTimer);
       info.autoLeaveTimer = undefined;
-      logger.info(`Cancelled auto-leave timer for guild ${guildId}`);
+      logger.debug(`Cleared auto-leave timer for guild ${guildId}`);
     }
   }
 

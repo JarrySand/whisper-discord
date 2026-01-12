@@ -14,6 +14,7 @@ import { commands, setSqliteStoreManager } from './commands/index.js';
 import { connectionManager } from './voice/connection.js';
 import { guildSettings } from './services/guild-settings.js';
 import { guildApiKeys } from './services/guild-api-keys.js';
+import { guildHotwords } from './services/guild-hotwords.js';
 // SQLite は条件付きで動的インポート（メモリ節約）
 type SqliteStoreManager = import('./output/sqlite-store.js').SqliteStoreManager;
 
@@ -134,13 +135,13 @@ export class Bot {
    */
   private handleVoiceStateUpdate(oldState: VoiceState, newState: VoiceState): void {
     const guildId = oldState.guild.id;
-    
+
     // Bot が接続しているギルドかチェック
     const connectionInfo = connectionManager.getConnection(guildId);
     if (!connectionInfo) return;
 
     const botChannelId = connectionInfo.channelId;
-    
+
     // Bot のチャンネルに関係のない変更は無視
     if (oldState.channelId !== botChannelId && newState.channelId !== botChannelId) {
       return;
@@ -161,12 +162,10 @@ export class Bot {
     logger.debug(`Voice state update in ${connectionInfo.channelName}: ${humanCount} human member(s)`);
 
     if (humanCount === 0) {
-      // 誰もいなくなった → 自動離脱タイマー開始
-      connectionManager.startAutoLeaveTimer(guildId);
-    } else {
-      // 誰かいる → タイマーキャンセル
-      connectionManager.cancelAutoLeaveTimer(guildId);
+      // 誰もいなくなった → 即時自動退出（レポート生成含む）
+      connectionManager.handleEmptyChannel(guildId);
     }
+    // 誰かいる場合は何もしない（即時退出なのでタイマーキャンセル不要）
   }
 
   /**
@@ -209,6 +208,9 @@ export class Bot {
       // Guild別APIキー設定を初期化
       await guildApiKeys.initialize();
 
+      // Guild別ホットワード設定を初期化
+      await guildHotwords.initialize();
+
       await this.client.login(botConfig.token);
     } catch (error) {
       logger.error('Failed to start bot:', error);
@@ -230,6 +232,9 @@ export class Bot {
 
     // Guild別APIキー設定を保存
     await guildApiKeys.save();
+
+    // Guild別ホットワード設定を保存
+    await guildHotwords.save();
 
     // SQLite ストアマネージャーを閉じる
     if (this.sqliteStoreManager) {
