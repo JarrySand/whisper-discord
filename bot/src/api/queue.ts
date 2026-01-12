@@ -17,6 +17,11 @@ import type {
 } from '../types/index.js';
 
 /**
+ * プロンプト取得関数の型
+ */
+export type PromptProvider = () => string | null;
+
+/**
  * 文字起こしキュー
  */
 export class TranscriptionQueue extends EventEmitter {
@@ -25,8 +30,9 @@ export class TranscriptionQueue extends EventEmitter {
   private config: QueueConfig;
   private whisperClient: WhisperClient;
   private circuitBreaker: CircuitBreaker | null;
+  private promptProvider: PromptProvider | null;
   private isRunning = false;
-  
+
   // レート制限対策: 最後のリクエスト時刻
   private lastRequestTime = 0;
   private readonly minRequestInterval = 3500; // 3.5秒間隔 (20リクエスト/分以下)
@@ -34,11 +40,13 @@ export class TranscriptionQueue extends EventEmitter {
   constructor(
     whisperClient: WhisperClient,
     config: Partial<QueueConfig> = {},
-    circuitBreaker: CircuitBreaker | null = null
+    circuitBreaker: CircuitBreaker | null = null,
+    promptProvider: PromptProvider | null = null
   ) {
     super();
     this.whisperClient = whisperClient;
     this.circuitBreaker = circuitBreaker;
+    this.promptProvider = promptProvider;
     this.config = {
       maxSize: config.maxSize ?? 100,
       maxRetries: config.maxRetries ?? 3,
@@ -165,6 +173,9 @@ export class TranscriptionQueue extends EventEmitter {
       );
     });
 
+    // プロンプトを取得
+    const prompt = this.promptProvider ? this.promptProvider() : undefined;
+
     // サーキットブレーカー経由で実行
     const transcribeOperation = async (): Promise<TranscribeResponse> => {
       return this.whisperClient.transcribe({
@@ -175,6 +186,7 @@ export class TranscriptionQueue extends EventEmitter {
         displayName: item.segment.displayName,
         startTs: item.segment.startTimestamp,
         endTs: item.segment.endTimestamp,
+        prompt: prompt ?? undefined,
       });
     };
 

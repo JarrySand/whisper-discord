@@ -25,6 +25,7 @@ import type {
   TranscriptionResult,
   OutputManagerConfig,
 } from '../types/index.js';
+import { guildPrompts } from './guild-prompt.js';
 
 /**
  * 拡張セッションコンテキスト（出力チャンネル情報を含む）
@@ -60,17 +61,23 @@ export class TranscriptionService extends EventEmitter {
   private aizuchiFilter: AizuchiFilter;
   private hallucinationFilter: HallucinationFilter;
 
-  constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}) {
+  constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}, guildId?: string) {
     super();
 
-    // コンポーネント初期化
-    this.whisperClient = new WhisperClient(config.whisper);
+    // プロンプト取得関数（guildIdがある場合のみ）
+    const promptProvider = guildId
+      ? () => guildPrompts.getPrompt(guildId)
+      : null;
+
+    // コンポーネント初期化（Guild別APIキー対応）
+    this.whisperClient = new WhisperClient(config.whisper, guildId);
     this.circuitBreaker = new CircuitBreaker(config.circuitBreaker);
     this.healthMonitor = new HealthMonitor(this.whisperClient, config.healthMonitor);
     this.queue = new TranscriptionQueue(
       this.whisperClient,
       config.queue,
-      this.circuitBreaker
+      this.circuitBreaker,
+      promptProvider
     );
     this.offlineHandler = new OfflineHandler(config.offline);
     this.metricsCollector = new MetricsCollector();
@@ -305,6 +312,32 @@ export class TranscriptionService extends EventEmitter {
 
     this.emit('stopped', this.sessionContext);
     this.sessionContext = null;
+  }
+
+  /**
+   * キューが空になるまで待機（処理中のアイテムも含む）
+   * @param timeoutMs 最大待機時間（デフォルト: 30秒）
+   */
+  async waitForQueueDrain(timeoutMs: number = 30000): Promise<void> {
+    const startTime = Date.now();
+    const checkInterval = 500; // 500msごとにチェック
+
+    while (Date.now() - startTime < timeoutMs) {
+      const status = this.queue.getStatus();
+      if (status.queued === 0 && status.processing === 0) {
+        logger.debug('Queue drained successfully');
+        return;
+      }
+
+      logger.debug(`Waiting for queue drain: ${status.queued} queued, ${status.processing} processing`);
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    }
+
+    const finalStatus = this.queue.getStatus();
+    logger.warn(`Queue drain timeout after ${timeoutMs}ms`, {
+      queued: finalStatus.queued,
+      processing: finalStatus.processing,
+    });
   }
 
   /**

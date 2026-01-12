@@ -4,7 +4,6 @@ import {
   ChannelType,
   GuildMember,
   TextChannel,
-  PermissionFlagsBits,
 } from 'discord.js';
 import {
   joinVoiceChannel,
@@ -18,6 +17,7 @@ import { connectionManager } from '../voice/connection.js';
 import { VoiceReceiverHandler } from '../voice/receiver.js';
 import { TranscriptionService } from '../services/transcription-service.js';
 import { guildSettings } from '../services/guild-settings.js';
+import { guildApiKeys } from '../services/guild-api-keys.js';
 import { getSqliteStoreManager } from './index.js';
 
 export const joinCommand: Command = {
@@ -48,6 +48,22 @@ export const joinCommand: Command = {
       return;
     }
 
+    // Guild APIキーが設定されているかチェック
+    if (!guildApiKeys.hasApiKey(guild.id)) {
+      await interaction.editReply(
+        '❌ **APIキーが設定されていません**\n\n' +
+        '文字起こしを使用するには、サーバー管理者がAPIキーを設定する必要があります。\n\n' +
+        '**設定方法:**\n' +
+        '```\n' +
+        '/apikey set provider:Groq api_key:gsk_xxxxx\n' +
+        '```\n\n' +
+        '**APIキーの取得:**\n' +
+        '• Groq（推奨）: https://console.groq.com/\n' +
+        '• OpenAI: https://platform.openai.com/'
+      );
+      return;
+    }
+
     // 参加するチャンネルを決定
     let voiceChannel = interaction.options.getChannel('channel');
 
@@ -75,7 +91,7 @@ export const joinCommand: Command = {
 
     // 出力チャンネルを決定
     // 1. コマンドで指定された場合はそれを使用し、設定に保存
-    // 2. 指定されていない場合は保存された設定を使用
+    // 2. 指定されていない場合は保存された設定を使用（最初に指定したチャンネル）
     let outputChannel = interaction.options.getChannel('output_channel');
     let usedSavedSetting = false;
 
@@ -88,11 +104,13 @@ export const joinCommand: Command = {
         guild.name
       );
     } else {
-      // 保存された設定を使用
+      // 保存された設定を使用（最初に指定したチャンネルがデフォルトになる）
       const savedChannel = guildSettings.getDefaultOutputChannel(guild.id);
       if (savedChannel) {
         try {
-          const fetchedChannel = await guild.channels.fetch(savedChannel.channelId);
+          // キャッシュから取得を試み、なければAPIから取得（タイムアウト対策）
+          const fetchedChannel = guild.channels.cache.get(savedChannel.channelId)
+            ?? await guild.channels.fetch(savedChannel.channelId);
           if (fetchedChannel && fetchedChannel.type === ChannelType.GuildText) {
             outputChannel = fetchedChannel;
             usedSavedSetting = true;
@@ -100,7 +118,7 @@ export const joinCommand: Command = {
           } else {
             // チャンネルが存在しないか、テキストチャンネルでない場合は設定をクリア
             guildSettings.clearDefaultOutputChannel(guild.id);
-            logger.warn(`Saved output channel ${savedChannel.channelId} no longer valid, cleared setting`);
+            logger.warn(`Saved output channel ${savedChannel.channelId} no longer valid (type: ${fetchedChannel?.type}), cleared setting`);
           }
         } catch (error) {
           // チャンネル取得に失敗した場合は設定をクリア
@@ -114,21 +132,6 @@ export const joinCommand: Command = {
     if (connectionManager.hasConnection(guild.id)) {
       await interaction.editReply('❌ すでにボイスチャンネルに参加しています');
       return;
-    }
-
-    // 権限チェック: ボイスチャンネルへの接続・発言権限を確認
-    const botMember = guild.members.cache.get(interaction.client.user!.id);
-    const resolvedChannel = guild.channels.cache.get(voiceChannel.id);
-    if (botMember && resolvedChannel?.isVoiceBased()) {
-      const permissions = resolvedChannel.permissionsFor(botMember);
-      if (!permissions?.has(PermissionFlagsBits.Connect)) {
-        await interaction.editReply('❌ ボイスチャンネルに接続する権限がありません');
-        return;
-      }
-      if (!permissions?.has(PermissionFlagsBits.Speak)) {
-        await interaction.editReply('❌ ボイスチャンネルで発言する権限がありません');
-        return;
-      }
     }
 
     try {
@@ -145,10 +148,22 @@ export const joinCommand: Command = {
       // 接続完了を待機
       await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
-      // 出力チャンネルを取得
-      const textChannel = outputChannel
-        ? (await guild.channels.fetch(outputChannel.id)) as TextChannel
-        : undefined;
+      // 出力チャンネルをTextChannelとして取得
+      let textChannel: TextChannel | undefined;
+      if (outputChannel) {
+        if (usedSavedSetting) {
+          // 保存された設定から取得した場合は既にGuildChannel型
+          textChannel = outputChannel as TextChannel;
+        } else {
+          // コマンドで指定された場合はfetchが必要
+          textChannel = (await guild.channels.fetch(outputChannel.id)) as TextChannel;
+        }
+        logger.debug('Output channel resolved:', {
+          id: textChannel.id,
+          name: textChannel.name,
+          usedSavedSetting
+        });
+      }
 
       // 接続を管理に追加
       connectionManager.addConnection(guild.id, {
@@ -165,7 +180,7 @@ export const joinCommand: Command = {
       const receiverHandler = new VoiceReceiverHandler(connection, guild);
       connectionManager.setReceiverHandler(guild.id, receiverHandler);
 
-      // 文字起こしサービスを初期化
+      // 文字起こしサービスを初期化（Guild別APIキー対応）
       const transcriptionService = new TranscriptionService({
         whisper: {
           baseUrl: botConfig.whisper.apiUrl,
@@ -207,7 +222,7 @@ export const joinCommand: Command = {
             },
           },
         },
-      });
+      }, guild.id);
 
       // bot.tsのSqliteStoreManagerをOutputManagerに共有（検索機能と同一インスタンスを使用）
       const sharedSqliteManager = getSqliteStoreManager();

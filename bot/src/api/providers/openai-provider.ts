@@ -75,6 +75,11 @@ export class OpenAIProvider implements TranscriptionProvider {
         formData.append('language', request.language);
       }
 
+      // プロンプト（文脈や専門用語を指定）
+      if (request.prompt) {
+        formData.append('prompt', request.prompt);
+      }
+
       // レスポンス形式
       formData.append('response_format', 'verbose_json');
 

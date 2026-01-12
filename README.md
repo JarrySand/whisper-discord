@@ -38,6 +38,7 @@
 | 🎯 ユーザーごとの音声取得 | ✅ Voice Receive API で個別録音 |
 | 🎯 リアルタイム性は不要 | ✅ **さらにリアルタイム投稿も実装** |
 | 🎯 議事録化は不要 | ✅ **さらにMarkdown議事録も自動生成** |
+| 🎯 複数サーバー対応 | ✅ サーバー別APIキー管理（AES-256-GCM暗号化） |
 
 > 📄 開発経緯の詳細は [`difficulty.md`](./difficulty.md) を参照
 
@@ -165,6 +166,7 @@ npm start
 | 📝 **複数形式出力** | Discord投稿、ログファイル、JSON、Markdown |
 | 🔍 **検索機能** | 過去の発言をサーバー別に検索可能 |
 | ☁️ **複数プロバイダー対応** | ローカル/Groq/OpenAI から選択可能 |
+| 🔑 **サーバー別APIキー** | サーバーごとに異なるAPIキーを設定可能 |
 | 🧹 **相槌フィルター** | 「うん」「はい」等を自動除去 |
 | 🛡️ **ハルシネーション対策** | Whisperの幻覚を検出・除去 |
 
@@ -172,13 +174,24 @@ npm start
 
 # 📋 使い方
 
+## 初期設定（必須）
+
+Botを使用する前に、サーバー管理者がAPIキーを設定する必要があります。
+
+```
+/apikey set provider:Groq api_key:gsk_xxxxx
+```
+
+> APIキーの取得: [Groq](https://console.groq.com/)（推奨）または [OpenAI](https://platform.openai.com/)
+
 ## 基本的な流れ
 
 ```
-1. Bot をボイスチャンネルに招待  →  /join
-2. 会話を開始                    →  自動で文字起こし
-3. テキストチャンネルで確認      →  リアルタイム表示
-4. 終了                          →  /leave
+1. APIキーを設定（初回のみ）      →  /apikey set
+2. Bot をボイスチャンネルに招待  →  /join
+3. 会話を開始                    →  自動で文字起こし
+4. テキストチャンネルで確認      →  リアルタイム表示
+5. 終了                          →  /leave
 ```
 
 ## コマンド一覧
@@ -200,6 +213,25 @@ Bot をボイスチャンネルから退出させます。
 ### `/search keyword:検索ワード` (SQLite有効時)
 過去の発言を検索します。
 - `user:@ユーザー名` で特定ユーザーに絞り込み可能
+
+### `/apikey` (管理者のみ・必須)
+サーバーごとにWhisper APIキーを設定します。**文字起こしを使用するには、このコマンドでの設定が必須です。**
+
+| サブコマンド | 説明 |
+|-------------|------|
+| `/apikey set` | APIキーを設定（Groq/OpenAI/Self-hosted） |
+| `/apikey clear` | APIキー設定を削除 |
+| `/apikey status` | 現在の設定を確認 |
+| `/apikey test` | APIキーの有効性をテスト |
+
+**使用例:**
+```
+/apikey set provider:Groq api_key:gsk_xxxxx
+/apikey set provider:OpenAI api_key:sk-xxxxx
+/apikey set provider:Self-hosted url:http://localhost:8000
+```
+
+> 💡 サーバー管理者のみ実行可能。APIキー未設定で `/join` を実行するとエラーになります。
 
 ## 📂 出力形式
 
@@ -450,13 +482,9 @@ whisper-discord/
 DISCORD_BOT_TOKEN=your_token_here
 DISCORD_CLIENT_ID=your_client_id
 
-# === Whisper API接続 ===
-WHISPER_API_URL=http://localhost:8000
-WHISPER_API_TIMEOUT=60000
-
 # === 音声処理 ===
-AUDIO_SILENCE_THRESHOLD=800      # 無音検知閾値 (ms)
-AUDIO_MAX_SEGMENT_DURATION=8000  # 最大セグメント長 (ms)
+AUDIO_SILENCE_THRESHOLD=1500     # 無音検知閾値 (ms)
+AUDIO_MAX_SEGMENT_DURATION=30000 # 最大セグメント長 (ms)
 AUDIO_MIN_SEGMENT_DURATION=1000  # 最小セグメント長 (ms)
 AUDIO_MIN_RMS_THRESHOLD=0.005    # 最小音量閾値
 
@@ -471,6 +499,8 @@ OUTPUT_ENABLE_MARKDOWN=true      # Markdown保存
 ENABLE_SQLITE=false
 SQLITE_DB_DIR=./data
 ```
+
+> 📝 **文字起こしAPIの設定**は環境変数ではなく、`/apikey` コマンドでサーバーごとに設定します。
 
 ## Whisper API 設定 (`whisper-api/.env`)
 
@@ -498,7 +528,8 @@ WHISPER_HOTWORDS_FILE=../config/hotwords.json
 
 | ドキュメント | 内容 | 対象読者 |
 |-------------|------|---------|
-| [USER_GUIDE.md](./docs/USER_GUIDE.md) | 使い方・機能一覧・トラブルシューティング | 一般ユーザー |
+| [QUICK_START.md](./docs/QUICK_START.md) | 招待後の初期設定・コマンド一覧 | 一般ユーザー |
+| [USER_GUIDE.md](./docs/USER_GUIDE.md) | 詳細な使い方・トラブルシューティング | 一般ユーザー |
 | [TECHNICAL_OVERVIEW.md](./docs/TECHNICAL_OVERVIEW.md) | 高品質日本語文字起こしの技術解説 | エンジニア |
 | [spec.md](./docs/spec.md) | 詳細な設計仕様 | 開発者 |
 

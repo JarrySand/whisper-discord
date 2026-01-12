@@ -291,13 +291,13 @@ describe('TranscriptionQueue', () => {
       queue.start();
       queue.enqueue(createMockSegment());
 
-      // リトライを待つ
-      await new Promise((r) => setTimeout(r, 500));
+      // minRequestInterval (3.5s) + 余裕で5秒待つ
+      await new Promise((r) => setTimeout(r, 5000));
 
       expect(retryCount).toBeGreaterThan(0);
 
       queue.stop();
-    });
+    }, 10000);
 
     test('最大リトライ回数を超えるとfailedイベント', async () => {
       const mockClient = createMockWhisperClient({ shouldFail: true, delay: 10 });
@@ -311,12 +311,13 @@ describe('TranscriptionQueue', () => {
       queue.start();
       queue.enqueue(createMockSegment());
 
-      await new Promise((r) => setTimeout(r, 500));
+      // minRequestInterval (3.5s) * maxRetries (1) + 余裕 = 8秒待機
+      await new Promise((r) => setTimeout(r, 8000));
 
       expect(failed).toBe(true);
 
       queue.stop();
-    });
+    }, 15000);
   });
 
   describe('サーキットブレーカー連携', () => {

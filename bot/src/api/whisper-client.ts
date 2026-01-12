@@ -7,7 +7,7 @@ import axios, { AxiosInstance, isAxiosError } from 'axios';
 import FormData from 'form-data';
 import { logger } from '../utils/logger.js';
 import { botConfig } from '../config/index.js';
-import { createProviderFromEnv } from './providers/index.js';
+import { createProviderForGuild } from './providers/index.js';
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
@@ -38,9 +38,9 @@ export class WhisperClient {
   private provider: TranscriptionProvider | null = null;
   private providerType: string;
 
-  constructor(config: Partial<WhisperClientConfig> = {}) {
-    this.providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
-    
+  constructor(config: Partial<WhisperClientConfig> = {}, guildId?: string) {
+    this.providerType = 'self-hosted';
+
     this.config = {
       baseUrl: config.baseUrl ?? botConfig.whisper.apiUrl,
       timeout: config.timeout ?? botConfig.whisper.timeout,
@@ -49,18 +49,18 @@ export class WhisperClient {
       retryBackoffMultiplier: config.retryBackoffMultiplier ?? 2,
     };
 
-    // プロバイダータイプに応じて初期化
-    if (this.providerType === 'groq' || this.providerType === 'openai') {
-      // クラウドプロバイダーを使用
-      this.provider = createProviderFromEnv();
-      logger.info(`WhisperClient initialized with ${this.providerType} provider`);
+    // Guild別プロバイダーを使用（guildIdが指定されている場合）
+    if (guildId) {
+      this.provider = createProviderForGuild(guildId);
+      this.providerType = this.provider.constructor.name.replace('Provider', '').toLowerCase();
+      logger.info(`WhisperClient initialized with guild-specific provider for ${guildId}: ${this.providerType}`);
     } else {
-      // セルフホスト Whisper API を使用
+      // guildIdがない場合はセルフホスト Whisper API を使用（ヘルスチェック等のユーティリティ用）
       this.client = axios.create({
         baseURL: this.config.baseUrl,
         timeout: this.config.timeout,
       });
-      logger.info(`WhisperClient initialized: ${this.config.baseUrl}`);
+      logger.info(`WhisperClient initialized with self-hosted API: ${this.config.baseUrl}`);
     }
   }
 
@@ -91,6 +91,7 @@ export class WhisperClient {
       language: request.language ?? 'ja',
       userId: request.userId,
       username: request.username,
+      prompt: request.prompt,
     };
 
     const startTime = Date.now();
@@ -149,6 +150,11 @@ export class WhisperClient {
     formData.append('start_ts', request.startTs.toString());
     formData.append('end_ts', request.endTs.toString());
     formData.append('language', request.language ?? 'ja');
+
+    // プロンプト
+    if (request.prompt) {
+      formData.append('prompt', request.prompt);
+    }
 
     return this.executeWithRetry(async () => {
       const response = await this.client!.post<TranscribeResponse>(

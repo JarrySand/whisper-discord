@@ -15,6 +15,7 @@ import type {
 import { SelfHostedWhisperProvider } from './local-whisper-provider.js';
 import { OpenAIProvider } from './openai-provider.js';
 import { GroqProvider } from './groq-provider.js';
+import { guildApiKeys } from '../../services/guild-api-keys.js';
 
 /**
  * プロバイダーファクトリー
@@ -41,40 +42,44 @@ export function createProvider(config: ProviderConfig): TranscriptionProvider {
 }
 
 /**
- * 環境変数からプロバイダーを生成
+ * Guild別プロバイダーを生成
  *
- * TRANSCRIPTION_PROVIDER の値:
- *   - "self-hosted" または "local": セルフホスト Whisper API (ローカルまたは外部サーバー)
- *   - "openai": OpenAI Whisper API
- *   - "groq": Groq Whisper API (whisper-large-v3, 超高速)
+ * Guild固有のAPIキー設定からプロバイダーを生成
+ * 設定がない場合はエラーをスロー（/apikey コマンドでの設定が必須）
+ *
+ * @param guildId サーバーID
+ * @returns 文字起こしプロバイダー
+ * @throws Error APIキーが設定されていない場合
  */
-export function createProviderFromEnv(): TranscriptionProvider {
-  const providerType = process.env.TRANSCRIPTION_PROVIDER ?? 'self-hosted';
+export function createProviderForGuild(guildId: string): TranscriptionProvider {
+  const guildConfig = guildApiKeys.getApiKeyConfig(guildId);
 
-  switch (providerType) {
+  if (!guildConfig) {
+    throw new Error(`API key not configured for guild ${guildId}. Use /apikey set command to configure.`);
+  }
+
+  logger.info(`Using guild-specific provider for ${guildId}: ${guildConfig.provider}`);
+
+  switch (guildConfig.provider) {
     case 'groq': {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) {
-        throw new Error('GROQ_API_KEY is required for Groq provider');
+      if (!guildConfig.apiKey) {
+        throw new Error(`Groq API key not found for guild ${guildId}`);
       }
-      const model = (process.env.GROQ_MODEL as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
-      return new GroqProvider({ apiKey, model });
+      const model = (guildConfig.model as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
+      return new GroqProvider({ apiKey: guildConfig.apiKey, model });
     }
 
     case 'openai': {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is required for OpenAI provider');
+      if (!guildConfig.apiKey) {
+        throw new Error(`OpenAI API key not found for guild ${guildId}`);
       }
-      return new OpenAIProvider({ apiKey });
+      return new OpenAIProvider({ apiKey: guildConfig.apiKey });
     }
 
     case 'self-hosted':
-    case 'local': // 後方互換性のため
     default:
       return new SelfHostedWhisperProvider({
-        baseUrl: process.env.WHISPER_API_URL ?? 'http://localhost:8000',
+        baseUrl: guildConfig.selfHostedUrl ?? 'http://localhost:8000',
       });
   }
 }
-
