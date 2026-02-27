@@ -1,6 +1,6 @@
-import type { GuildMember } from 'discord.js';
-import type { SSRCUserInfo } from '../types/index.js';
-import { logger } from '../utils/logger.js';
+import type { GuildMember } from "discord.js";
+import type { SSRCUserInfo } from "../types/index.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * SSRC → UserID マッピング管理
@@ -28,7 +28,7 @@ export class SSRCMapper {
     this.userIdToSSRC.set(userId, ssrc);
 
     logger.debug(
-      `Registered SSRC ${ssrc} for user ${info.displayName} (${userId})`
+      `Registered SSRC ${ssrc} for user ${info.displayName} (${userId})`,
     );
   }
 
@@ -90,7 +90,7 @@ export class SSRCMapper {
   clear(): void {
     this.map.clear();
     this.userIdToSSRC.clear();
-    logger.debug('Cleared all SSRC mappings');
+    logger.debug("Cleared all SSRC mappings");
   }
 
   /**
@@ -107,4 +107,3 @@ export class SSRCMapper {
     return Array.from(this.map.values());
   }
 }
-

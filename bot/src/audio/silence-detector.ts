@@ -1,4 +1,4 @@
-import type { SilenceDetectionConfig } from '../types/index.js';
+import type { SilenceDetectionConfig } from "../types/index.js";
 
 /**
  * デフォルトの無音検知設定
@@ -153,4 +153,3 @@ export class RMSSilenceDetector {
     this.silenceStartTime = null;
   }
 }
-

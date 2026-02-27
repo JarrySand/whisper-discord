@@ -1,19 +1,21 @@
 /**
  * HealthMonitor テスト
- * 
+ *
  * テスト項目:
  * - モニタリングの開始と停止
  * - ヘルスチェックの実行
  * - healthy/unhealthy イベントの発火
  * - 連続成功/失敗のカウント
  */
-import { HealthMonitor } from '../../api/health-monitor.js';
-import type { WhisperClient } from '../../api/whisper-client.js';
+import { HealthMonitor } from "../../api/health-monitor.js";
+import type { WhisperClient } from "../../api/whisper-client.js";
 
 /**
  * モックのWhisperClientを作成
  */
-function createMockWhisperClient(healthStatus: 'healthy' | 'unhealthy' = 'healthy'): WhisperClient {
+function createMockWhisperClient(
+  healthStatus: "healthy" | "unhealthy" = "healthy",
+): WhisperClient {
   return {
     healthCheck: jest.fn().mockResolvedValue({
       status: healthStatus,
@@ -22,7 +24,7 @@ function createMockWhisperClient(healthStatus: 'healthy' | 'unhealthy' = 'health
   } as unknown as WhisperClient;
 }
 
-describe('HealthMonitor', () => {
+describe("HealthMonitor", () => {
   let monitor: HealthMonitor;
   let mockClient: WhisperClient;
 
@@ -39,8 +41,8 @@ describe('HealthMonitor', () => {
     monitor.stop();
   });
 
-  describe('初期化', () => {
-    test('デフォルト設定で初期化される', () => {
+  describe("初期化", () => {
+    test("デフォルト設定で初期化される", () => {
       const defaultMonitor = new HealthMonitor(mockClient);
       const status = defaultMonitor.getStatus();
 
@@ -52,7 +54,7 @@ describe('HealthMonitor', () => {
       defaultMonitor.stop();
     });
 
-    test('カスタム設定で初期化される', () => {
+    test("カスタム設定で初期化される", () => {
       const customMonitor = new HealthMonitor(mockClient, {
         checkInterval: 5000,
         healthyThreshold: 5,
@@ -65,21 +67,21 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('モニタリング開始/停止', () => {
-    test('start()でモニタリングが開始される', () => {
+  describe("モニタリング開始/停止", () => {
+    test("start()でモニタリングが開始される", () => {
       monitor.start();
 
       expect(monitor.getStatus().isRunning).toBe(true);
     });
 
-    test('stop()でモニタリングが停止される', () => {
+    test("stop()でモニタリングが停止される", () => {
       monitor.start();
       monitor.stop();
 
       expect(monitor.getStatus().isRunning).toBe(false);
     });
 
-    test('重複したstart()は無視される', () => {
+    test("重複したstart()は無視される", () => {
       monitor.start();
       monitor.start(); // 2回目
 
@@ -87,8 +89,8 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('ヘルスチェック', () => {
-    test('start()で即座にチェックが実行される', async () => {
+  describe("ヘルスチェック", () => {
+    test("start()で即座にチェックが実行される", async () => {
       monitor.start();
 
       // チェックが実行されるまで待つ
@@ -97,14 +99,14 @@ describe('HealthMonitor', () => {
       expect(mockClient.healthCheck).toHaveBeenCalled();
     });
 
-    test('forceCheck()で手動チェックできる', async () => {
+    test("forceCheck()で手動チェックできる", async () => {
       const result = await monitor.forceCheck();
 
       expect(mockClient.healthCheck).toHaveBeenCalled();
-      expect(typeof result).toBe('boolean');
+      expect(typeof result).toBe("boolean");
     });
 
-    test('チェック成功で連続成功カウントが増える', async () => {
+    test("チェック成功で連続成功カウントが増える", async () => {
       await monitor.forceCheck();
       await monitor.forceCheck();
 
@@ -113,8 +115,8 @@ describe('HealthMonitor', () => {
       expect(status.consecutiveFailures).toBe(0);
     });
 
-    test('チェック失敗で連続失敗カウントが増える', async () => {
-      const failingClient = createMockWhisperClient('unhealthy');
+    test("チェック失敗で連続失敗カウントが増える", async () => {
+      const failingClient = createMockWhisperClient("unhealthy");
       const failingMonitor = new HealthMonitor(failingClient, {
         healthyThreshold: 2,
         unhealthyThreshold: 2,
@@ -131,10 +133,10 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('healthy イベント', () => {
-    test('閾値到達でhealthyイベントが発火する', async () => {
+  describe("healthy イベント", () => {
+    test("閾値到達でhealthyイベントが発火する", async () => {
       const healthyHandler = jest.fn();
-      monitor.on('healthy', healthyHandler);
+      monitor.on("healthy", healthyHandler);
 
       // 2回成功が必要
       await monitor.forceCheck();
@@ -144,9 +146,9 @@ describe('HealthMonitor', () => {
       expect(healthyHandler).toHaveBeenCalled();
     });
 
-    test('既にhealthyな場合はイベントは発火しない', async () => {
+    test("既にhealthyな場合はイベントは発火しない", async () => {
       const healthyHandler = jest.fn();
-      monitor.on('healthy', healthyHandler);
+      monitor.on("healthy", healthyHandler);
 
       await monitor.forceCheck();
       await monitor.forceCheck(); // ここでhealthy
@@ -156,14 +158,14 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('unhealthy イベント', () => {
-    test('閾値到達でunhealthyイベントが発火する', async () => {
+  describe("unhealthy イベント", () => {
+    test("閾値到達でunhealthyイベントが発火する", async () => {
       // まずhealthyにする
       await monitor.forceCheck();
       await monitor.forceCheck();
 
       // 失敗するクライアントに切り替え
-      const failingClient = createMockWhisperClient('unhealthy');
+      const failingClient = createMockWhisperClient("unhealthy");
       const failingMonitor = new HealthMonitor(failingClient, {
         healthyThreshold: 1,
         unhealthyThreshold: 2,
@@ -171,19 +173,19 @@ describe('HealthMonitor', () => {
 
       // まずhealthyにする
       (failingClient.healthCheck as jest.Mock).mockResolvedValueOnce({
-        status: 'healthy',
+        status: "healthy",
         timestamp: Date.now(),
       });
       await failingMonitor.forceCheck();
 
       // 失敗させる
       (failingClient.healthCheck as jest.Mock).mockResolvedValue({
-        status: 'unhealthy',
+        status: "unhealthy",
         timestamp: Date.now(),
       });
 
       const unhealthyHandler = jest.fn();
-      failingMonitor.on('unhealthy', unhealthyHandler);
+      failingMonitor.on("unhealthy", unhealthyHandler);
 
       await failingMonitor.forceCheck();
       expect(unhealthyHandler).not.toHaveBeenCalled();
@@ -195,21 +197,21 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('ステータス取得', () => {
-    test('getStatus()で現在のステータスを取得できる', async () => {
+  describe("ステータス取得", () => {
+    test("getStatus()で現在のステータスを取得できる", async () => {
       monitor.start();
       await new Promise((r) => setTimeout(r, 50));
 
       const status = monitor.getStatus();
 
-      expect(typeof status.isHealthy).toBe('boolean');
-      expect(typeof status.lastCheck).toBe('number');
-      expect(typeof status.consecutiveSuccesses).toBe('number');
-      expect(typeof status.consecutiveFailures).toBe('number');
-      expect(typeof status.isRunning).toBe('boolean');
+      expect(typeof status.isHealthy).toBe("boolean");
+      expect(typeof status.lastCheck).toBe("number");
+      expect(typeof status.consecutiveSuccesses).toBe("number");
+      expect(typeof status.consecutiveFailures).toBe("number");
+      expect(typeof status.isRunning).toBe("boolean");
     });
 
-    test('getIsHealthy()でヘルシー状態を取得できる', async () => {
+    test("getIsHealthy()でヘルシー状態を取得できる", async () => {
       expect(monitor.getIsHealthy()).toBe(false);
 
       await monitor.forceCheck();
@@ -219,8 +221,8 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('lastCheck タイムスタンプ', () => {
-    test('チェック実行でlastCheckが更新される', async () => {
+  describe("lastCheck タイムスタンプ", () => {
+    test("チェック実行でlastCheckが更新される", async () => {
       const before = monitor.getStatus().lastCheck;
 
       await new Promise((r) => setTimeout(r, 10));
@@ -231,15 +233,15 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('カウンターリセット', () => {
-    test('成功後の失敗で連続成功がリセットされる', async () => {
+  describe("カウンターリセット", () => {
+    test("成功後の失敗で連続成功がリセットされる", async () => {
       // 成功
       await monitor.forceCheck();
       expect(monitor.getStatus().consecutiveSuccesses).toBe(1);
 
       // 失敗するクライアントに変更
       (mockClient.healthCheck as jest.Mock).mockResolvedValueOnce({
-        status: 'unhealthy',
+        status: "unhealthy",
         timestamp: Date.now(),
       });
 
@@ -250,10 +252,10 @@ describe('HealthMonitor', () => {
       expect(status.consecutiveFailures).toBe(1);
     });
 
-    test('失敗後の成功で連続失敗がリセットされる', async () => {
+    test("失敗後の成功で連続失敗がリセットされる", async () => {
       // 失敗
       (mockClient.healthCheck as jest.Mock).mockResolvedValueOnce({
-        status: 'unhealthy',
+        status: "unhealthy",
         timestamp: Date.now(),
       });
       await monitor.forceCheck();
@@ -261,7 +263,7 @@ describe('HealthMonitor', () => {
 
       // 成功に戻す
       (mockClient.healthCheck as jest.Mock).mockResolvedValue({
-        status: 'healthy',
+        status: "healthy",
         timestamp: Date.now(),
       });
       await monitor.forceCheck();
@@ -272,10 +274,10 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('エラーハンドリング', () => {
-    test('healthCheck()が例外を投げても継続する', async () => {
+  describe("エラーハンドリング", () => {
+    test("healthCheck()が例外を投げても継続する", async () => {
       (mockClient.healthCheck as jest.Mock).mockRejectedValueOnce(
-        new Error('Network error')
+        new Error("Network error"),
       );
 
       await expect(monitor.forceCheck()).resolves.not.toThrow();
@@ -285,8 +287,8 @@ describe('HealthMonitor', () => {
     });
   });
 
-  describe('定期チェック', () => {
-    test('指定間隔でチェックが実行される', async () => {
+  describe("定期チェック", () => {
+    test("指定間隔でチェックが実行される", async () => {
       const fastMonitor = new HealthMonitor(mockClient, {
         checkInterval: 50,
         healthyThreshold: 1,
@@ -299,10 +301,11 @@ describe('HealthMonitor', () => {
       await new Promise((r) => setTimeout(r, 150));
 
       // 少なくとも2回は呼ばれているはず
-      expect((mockClient.healthCheck as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(
+        (mockClient.healthCheck as jest.Mock).mock.calls.length,
+      ).toBeGreaterThanOrEqual(2);
 
       fastMonitor.stop();
     });
   });
 });
-

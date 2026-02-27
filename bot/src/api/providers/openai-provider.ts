@@ -3,28 +3,28 @@
  *
  * OpenAI の Whisper API を使用（https://api.openai.com/v1/audio/transcriptions）
  */
-import axios, { AxiosInstance } from 'axios';
-import FormData from 'form-data';
-import { logger } from '../../utils/logger.js';
+import axios, { AxiosInstance } from "axios";
+import FormData from "form-data";
+import { logger } from "../../utils/logger.js";
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
   TranscriptionResponse,
   ProviderHealth,
   OpenAIConfig,
-} from '../transcription-provider.js';
+} from "../transcription-provider.js";
 
-const OPENAI_API_URL = 'https://api.openai.com/v1';
+const OPENAI_API_URL = "https://api.openai.com/v1";
 
-const DEFAULT_CONFIG: Omit<OpenAIConfig, 'type' | 'apiKey'> = {
-  model: 'whisper-1',
+const DEFAULT_CONFIG: Omit<OpenAIConfig, "type" | "apiKey"> = {
+  model: "whisper-1",
   timeout: 60000,
   retryCount: 3,
   retryDelay: 1000,
 };
 
 export class OpenAIProvider implements TranscriptionProvider {
-  readonly name = 'openai';
+  readonly name = "openai";
 
   private client: AxiosInstance;
   private config: OpenAIConfig;
@@ -32,11 +32,11 @@ export class OpenAIProvider implements TranscriptionProvider {
 
   constructor(config: Partial<OpenAIConfig> & { apiKey: string }) {
     if (!config.apiKey) {
-      throw new Error('OpenAI API key is required');
+      throw new Error("OpenAI API key is required");
     }
 
     this.config = {
-      type: 'openai',
+      type: "openai",
       apiKey: config.apiKey,
       model: config.model ?? DEFAULT_CONFIG.model,
       timeout: config.timeout ?? DEFAULT_CONFIG.timeout,
@@ -52,39 +52,41 @@ export class OpenAIProvider implements TranscriptionProvider {
       },
     });
 
-    logger.info('OpenAIProvider initialized');
+    logger.info("OpenAIProvider initialized");
   }
 
-  async transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+  async transcribe(
+    request: TranscriptionRequest,
+  ): Promise<TranscriptionResponse> {
     const startTime = Date.now();
 
     try {
       const formData = new FormData();
 
       // 音声ファイル
-      formData.append('file', request.audioData, {
+      formData.append("file", request.audioData, {
         filename: `audio.${request.audioFormat}`,
         contentType: this.getContentType(request.audioFormat),
       });
 
       // モデル（必須）
-      formData.append('model', this.config.model ?? 'whisper-1');
+      formData.append("model", this.config.model ?? "whisper-1");
 
       // 言語（オプション）
       if (request.language) {
-        formData.append('language', request.language);
+        formData.append("language", request.language);
       }
 
       // プロンプト（文脈や専門用語を指定）
       if (request.prompt) {
-        formData.append('prompt', request.prompt);
+        formData.append("prompt", request.prompt);
       }
 
       // レスポンス形式
-      formData.append('response_format', 'verbose_json');
+      formData.append("response_format", "verbose_json");
 
       const response = await this.executeWithRetry(async () => {
-        return await this.client.post('/audio/transcriptions', formData, {
+        return await this.client.post("/audio/transcriptions", formData, {
           headers: formData.getHeaders(),
         });
       });
@@ -102,14 +104,14 @@ export class OpenAIProvider implements TranscriptionProvider {
       };
     } catch (error) {
       const processingTimeMs = Date.now() - startTime;
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : "Unknown error";
 
-      logger.error('OpenAIProvider transcription failed:', { error: message });
+      logger.error("OpenAIProvider transcription failed:", { error: message });
 
       return {
         success: false,
         error: {
-          code: 'TRANSCRIPTION_FAILED',
+          code: "TRANSCRIPTION_FAILED",
           message,
         },
         processingTimeMs,
@@ -120,7 +122,7 @@ export class OpenAIProvider implements TranscriptionProvider {
   async healthCheck(): Promise<ProviderHealth> {
     // OpenAI API は models エンドポイントで確認
     try {
-      await this.client.get('/models/whisper-1', { timeout: 5000 });
+      await this.client.get("/models/whisper-1", { timeout: 5000 });
       this.isHealthy = true;
 
       return {
@@ -138,7 +140,7 @@ export class OpenAIProvider implements TranscriptionProvider {
         isHealthy: false,
         providerName: this.name,
         details: {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         },
       };
     }
@@ -150,14 +152,14 @@ export class OpenAIProvider implements TranscriptionProvider {
 
   private getContentType(format: string): string {
     switch (format) {
-      case 'ogg':
-        return 'audio/ogg';
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'webm':
-        return 'audio/webm';
+      case "ogg":
+        return "audio/ogg";
+      case "mp3":
+        return "audio/mpeg";
+      case "webm":
+        return "audio/webm";
       default:
-        return 'audio/wav';
+        return "audio/wav";
     }
   }
 
@@ -165,7 +167,7 @@ export class OpenAIProvider implements TranscriptionProvider {
    * OpenAI の segments から confidence を推定
    */
   private estimateConfidence(
-    segments?: Array<{ avg_logprob?: number }>
+    segments?: Array<{ avg_logprob?: number }>,
   ): number {
     if (!segments || segments.length === 0) {
       return 0.8; // デフォルト
@@ -179,9 +181,7 @@ export class OpenAIProvider implements TranscriptionProvider {
     return Math.min(1.0, Math.max(0.0, 1.0 + avgLogprob / 3));
   }
 
-  private async executeWithRetry<T>(
-    operation: () => Promise<T>
-  ): Promise<T> {
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null;
     let delay = this.config.retryDelay ?? 1000;
 
@@ -195,7 +195,9 @@ export class OpenAIProvider implements TranscriptionProvider {
           break;
         }
 
-        logger.warn(`Retry attempt ${attempt + 1}`, { error: lastError.message });
+        logger.warn(`Retry attempt ${attempt + 1}`, {
+          error: lastError.message,
+        });
         await this.sleep(delay);
         delay *= 2;
       }
@@ -208,4 +210,3 @@ export class OpenAIProvider implements TranscriptionProvider {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-

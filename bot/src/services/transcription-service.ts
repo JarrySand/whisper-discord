@@ -5,18 +5,18 @@
  * - メトリクス収集
  * - 出力マネージャー統合
  */
-import { EventEmitter } from 'events';
-import { TextChannel } from 'discord.js';
-import { logger } from '../utils/logger.js';
-import { WhisperClient } from '../api/whisper-client.js';
-import { TranscriptionQueue } from '../api/queue.js';
-import { CircuitBreaker, CircuitState } from '../api/circuit-breaker.js';
-import { HealthMonitor } from '../api/health-monitor.js';
-import { OfflineHandler } from '../api/offline-handler.js';
-import { MetricsCollector } from '../api/metrics.js';
-import { OutputManager } from '../output/manager.js';
-import { AizuchiFilter } from '../filters/aizuchi-filter.js';
-import { HallucinationFilter } from '../filters/hallucination-filter.js';
+import { EventEmitter } from "events";
+import { TextChannel } from "discord.js";
+import { logger } from "../utils/logger.js";
+import { WhisperClient } from "../api/whisper-client.js";
+import { TranscriptionQueue } from "../api/queue.js";
+import { CircuitBreaker, CircuitState } from "../api/circuit-breaker.js";
+import { HealthMonitor } from "../api/health-monitor.js";
+import { OfflineHandler } from "../api/offline-handler.js";
+import { MetricsCollector } from "../api/metrics.js";
+import { OutputManager } from "../output/manager.js";
+import { AizuchiFilter } from "../filters/aizuchi-filter.js";
+import { HallucinationFilter } from "../filters/hallucination-filter.js";
 import type {
   AudioSegment,
   TranscriptionServiceConfig,
@@ -24,8 +24,8 @@ import type {
   SessionContext,
   TranscriptionResult,
   OutputManagerConfig,
-} from '../types/index.js';
-import { guildPrompts } from './guild-prompt.js';
+} from "../types/index.js";
+import { guildPrompts } from "./guild-prompt.js";
 
 /**
  * 拡張セッションコンテキスト（出力チャンネル情報を含む）
@@ -61,7 +61,10 @@ export class TranscriptionService extends EventEmitter {
   private aizuchiFilter: AizuchiFilter;
   private hallucinationFilter: HallucinationFilter;
 
-  constructor(config: Partial<ExtendedTranscriptionServiceConfig> = {}, guildId?: string) {
+  constructor(
+    config: Partial<ExtendedTranscriptionServiceConfig> = {},
+    guildId?: string,
+  ) {
     super();
 
     // プロンプト取得関数（guildIdがある場合のみ）
@@ -72,12 +75,15 @@ export class TranscriptionService extends EventEmitter {
     // コンポーネント初期化（Guild別APIキー対応）
     this.whisperClient = new WhisperClient(config.whisper, guildId);
     this.circuitBreaker = new CircuitBreaker(config.circuitBreaker);
-    this.healthMonitor = new HealthMonitor(this.whisperClient, config.healthMonitor);
+    this.healthMonitor = new HealthMonitor(
+      this.whisperClient,
+      config.healthMonitor,
+    );
     this.queue = new TranscriptionQueue(
       this.whisperClient,
       config.queue,
       this.circuitBreaker,
-      promptProvider
+      promptProvider,
     );
     this.offlineHandler = new OfflineHandler(config.offline);
     this.metricsCollector = new MetricsCollector();
@@ -97,7 +103,7 @@ export class TranscriptionService extends EventEmitter {
 
     this.setupEventHandlers();
 
-    logger.info('TranscriptionService initialized', {
+    logger.info("TranscriptionService initialized", {
       outputEnabled: !!this.outputManager,
       filtersEnabled: true,
     });
@@ -108,8 +114,8 @@ export class TranscriptionService extends EventEmitter {
    */
   private setupEventHandlers(): void {
     // キュー完了イベント
-    this.queue.on('completed', (item, result) => {
-      logger.debug('Queue completed event received', {
+    this.queue.on("completed", (item, result) => {
+      logger.debug("Queue completed event received", {
         segmentId: item.id,
         success: result.success,
         hasData: !!result.data,
@@ -118,22 +124,26 @@ export class TranscriptionService extends EventEmitter {
 
       if (result.success && result.data) {
         // 空結果をスキップ（品質向上: QUALITY_IMPROVEMENT.md Phase 1.3）
-        let text = result.data.text?.trim() ?? '';
+        let text = result.data.text?.trim() ?? "";
         if (!text) {
-          logger.info('Skipping empty transcription result', {
+          logger.info("Skipping empty transcription result", {
             segmentId: item.id,
             userId: result.data.user_id,
             username: result.data.username,
           });
           // メトリクスには記録（空結果の追跡用）
-          this.metricsCollector.recordRequest(true, result.data.processing_time_ms, 0);
+          this.metricsCollector.recordRequest(
+            true,
+            result.data.processing_time_ms,
+            0,
+          );
           return;
         }
 
         // ハルシネーションフィルター適用
         const hallucinationResult = this.hallucinationFilter.filter(text);
         if (hallucinationResult.wasFiltered) {
-          logger.info('Hallucination filtered', {
+          logger.info("Hallucination filtered", {
             segmentId: item.id,
             reason: hallucinationResult.reason,
             originalText: text.substring(0, 50),
@@ -143,21 +153,29 @@ export class TranscriptionService extends EventEmitter {
 
         // 相槌フィルター適用
         if (this.aizuchiFilter.isAizuchi(text)) {
-          logger.info('Aizuchi filtered', {
+          logger.info("Aizuchi filtered", {
             segmentId: item.id,
             text: text,
           });
           // 相槌はスキップ
-          this.metricsCollector.recordRequest(true, result.data.processing_time_ms, 0);
+          this.metricsCollector.recordRequest(
+            true,
+            result.data.processing_time_ms,
+            0,
+          );
           return;
         }
 
         // フィルタリング後に空になった場合はスキップ
         if (!text) {
-          logger.debug('Skipping empty result after filtering', {
+          logger.debug("Skipping empty result after filtering", {
             segmentId: item.id,
           });
-          this.metricsCollector.recordRequest(true, result.data.processing_time_ms, 0);
+          this.metricsCollector.recordRequest(
+            true,
+            result.data.processing_time_ms,
+            0,
+          );
           return;
         }
 
@@ -179,7 +197,7 @@ export class TranscriptionService extends EventEmitter {
         this.metricsCollector.recordRequest(
           true,
           result.data.processing_time_ms,
-          text.split(/\s+/).length
+          text.split(/\s+/).length,
         );
 
         // キュー待ち時間記録
@@ -188,63 +206,67 @@ export class TranscriptionService extends EventEmitter {
 
         // 出力マネージャーに送信
         if (this.outputManager) {
-          logger.info('Sending to OutputManager', {
+          logger.info("Sending to OutputManager", {
             segmentId: transcriptionResult.segmentId,
             text: transcriptionResult.text.substring(0, 50),
             displayName: transcriptionResult.displayName,
           });
           this.outputManager.output(transcriptionResult).catch((err) => {
-            logger.error('Output failed', { error: err });
+            logger.error("Output failed", { error: err });
           });
         } else {
-          logger.warn('OutputManager is null, skipping output');
+          logger.warn("OutputManager is null, skipping output");
         }
 
-        this.emit('transcribed', transcriptionResult);
+        this.emit("transcribed", transcriptionResult);
       }
     });
 
     // キュー失敗イベント
-    this.queue.on('failed', (item, error) => {
+    this.queue.on("failed", (item, error) => {
       this.metricsCollector.recordRequest(false, 0);
-      logger.error(`Transcription failed: ${item.id}`, { error: error.message });
+      logger.error(`Transcription failed: ${item.id}`, {
+        error: error.message,
+      });
 
       // オフラインに保存
       this.offlineHandler.saveForLater(item.segment).catch((err) => {
-        logger.error('Failed to save segment for later', { error: err.message });
+        logger.error("Failed to save segment for later", {
+          error: err.message,
+        });
       });
 
-      this.emit('failed', { segment: item.segment, error });
+      this.emit("failed", { segment: item.segment, error });
     });
 
     // キューリトライイベント
-    this.queue.on('retry', () => {
+    this.queue.on("retry", () => {
       this.metricsCollector.recordRetry();
     });
 
     // ヘルスモニターイベント
-    this.healthMonitor.on('unhealthy', () => {
-      logger.warn('Whisper API is unhealthy');
-      this.emit('apiUnhealthy');
+    this.healthMonitor.on("unhealthy", () => {
+      logger.warn("Whisper API is unhealthy");
+      this.emit("apiUnhealthy");
     });
 
-    this.healthMonitor.on('healthy', () => {
-      logger.info('Whisper API is healthy');
-      this.emit('apiHealthy');
+    this.healthMonitor.on("healthy", () => {
+      logger.info("Whisper API is healthy");
+      this.emit("apiHealthy");
 
       // オフラインキューを処理
       this.processOfflineQueue();
     });
 
     // サーキットブレーカーイベント
-    this.circuitBreaker.on('open', () => {
-      logger.warn('Circuit breaker opened');
-      this.emit('circuitOpen');
+    this.circuitBreaker.on("open", () => {
+      logger.warn("Circuit breaker opened");
+      this.emit("circuitOpen");
     });
 
-    this.circuitBreaker.on('close', () => {
-      logger.info('Circuit breaker closed');
-      this.emit('circuitClose');
+    this.circuitBreaker.on("close", () => {
+      logger.info("Circuit breaker closed");
+      this.emit("circuitClose");
     });
   }
 
@@ -253,7 +275,7 @@ export class TranscriptionService extends EventEmitter {
    */
   async start(sessionContext: ExtendedSessionContext): Promise<void> {
     if (this.isRunning) {
-      logger.warn('TranscriptionService is already running');
+      logger.warn("TranscriptionService is already running");
       return;
     }
 
@@ -277,12 +299,12 @@ export class TranscriptionService extends EventEmitter {
       });
     }
 
-    logger.info('TranscriptionService started', {
+    logger.info("TranscriptionService started", {
       guildId: sessionContext.guildId,
       channelId: sessionContext.channelId,
     });
 
-    this.emit('started', sessionContext);
+    this.emit("started", sessionContext);
   }
 
   /**
@@ -308,9 +330,9 @@ export class TranscriptionService extends EventEmitter {
     this.metricsCollector.logSummary(this.queue.getStatus());
 
     this.isRunning = false;
-    logger.info('TranscriptionService stopped');
+    logger.info("TranscriptionService stopped");
 
-    this.emit('stopped', this.sessionContext);
+    this.emit("stopped", this.sessionContext);
     this.sessionContext = null;
   }
 
@@ -325,12 +347,14 @@ export class TranscriptionService extends EventEmitter {
     while (Date.now() - startTime < timeoutMs) {
       const status = this.queue.getStatus();
       if (status.queued === 0 && status.processing === 0) {
-        logger.debug('Queue drained successfully');
+        logger.debug("Queue drained successfully");
         return;
       }
 
-      logger.debug(`Waiting for queue drain: ${status.queued} queued, ${status.processing} processing`);
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      logger.debug(
+        `Waiting for queue drain: ${status.queued} queued, ${status.processing} processing`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
     }
 
     const finalStatus = this.queue.getStatus();
@@ -345,7 +369,7 @@ export class TranscriptionService extends EventEmitter {
    */
   async transcribe(segment: AudioSegment): Promise<void> {
     if (!this.isRunning) {
-      logger.warn('TranscriptionService is not running');
+      logger.warn("TranscriptionService is not running");
       return;
     }
 
@@ -353,7 +377,7 @@ export class TranscriptionService extends EventEmitter {
     if (this.circuitBreaker.getState() === CircuitState.OPEN) {
       logger.debug(`Circuit is open, saving segment for later: ${segment.id}`);
       await this.offlineHandler.saveForLater(segment);
-      this.emit('queuedOffline', segment);
+      this.emit("queuedOffline", segment);
       return;
     }
 
@@ -386,7 +410,14 @@ export class TranscriptionService extends EventEmitter {
   /**
    * ステータス取得
    */
-  getStatus(): TranscriptionServiceStatus & { outputPaths?: { log: string | null; json: string | null; markdown: string | null; sqliteDir: string | null } } {
+  getStatus(): TranscriptionServiceStatus & {
+    outputPaths?: {
+      log: string | null;
+      json: string | null;
+      markdown: string | null;
+      sqliteDir: string | null;
+    };
+  } {
     return {
       isRunning: this.isRunning,
       sessionContext: this.sessionContext,
@@ -436,4 +467,3 @@ export class TranscriptionService extends EventEmitter {
 }
 
 export default TranscriptionService;
-

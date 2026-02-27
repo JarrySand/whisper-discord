@@ -9,34 +9,34 @@
  * - whisper-large-v3 対応
  * - OpenAI 互換 API
  */
-import axios, { AxiosInstance } from 'axios';
-import FormData from 'form-data';
-import { logger } from '../../utils/logger.js';
+import axios, { AxiosInstance } from "axios";
+import FormData from "form-data";
+import { logger } from "../../utils/logger.js";
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
   TranscriptionResponse,
   ProviderHealth,
   BaseProviderConfig,
-} from '../transcription-provider.js';
+} from "../transcription-provider.js";
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1';
+const GROQ_API_URL = "https://api.groq.com/openai/v1";
 
 export interface GroqConfig extends BaseProviderConfig {
-  type: 'groq';
+  type: "groq";
   apiKey: string;
-  model?: 'whisper-large-v3' | 'whisper-large-v3-turbo';
+  model?: "whisper-large-v3" | "whisper-large-v3-turbo";
 }
 
-const DEFAULT_CONFIG: Omit<GroqConfig, 'type' | 'apiKey'> = {
-  model: 'whisper-large-v3',
-  timeout: 30000,  // 30秒タイムアウト
-  retryCount: 1,   // リトライ1回のみ（レート制限対策）
+const DEFAULT_CONFIG: Omit<GroqConfig, "type" | "apiKey"> = {
+  model: "whisper-large-v3",
+  timeout: 30000, // 30秒タイムアウト
+  retryCount: 1, // リトライ1回のみ（レート制限対策）
   retryDelay: 2000, // 2秒待機
 };
 
 export class GroqProvider implements TranscriptionProvider {
-  readonly name = 'groq';
+  readonly name = "groq";
 
   private client: AxiosInstance;
   private config: GroqConfig;
@@ -44,11 +44,11 @@ export class GroqProvider implements TranscriptionProvider {
 
   constructor(config: Partial<GroqConfig> & { apiKey: string }) {
     if (!config.apiKey) {
-      throw new Error('Groq API key is required');
+      throw new Error("Groq API key is required");
     }
 
     this.config = {
-      type: 'groq',
+      type: "groq",
       apiKey: config.apiKey,
       model: config.model ?? DEFAULT_CONFIG.model,
       timeout: config.timeout ?? DEFAULT_CONFIG.timeout,
@@ -67,7 +67,9 @@ export class GroqProvider implements TranscriptionProvider {
     logger.info(`GroqProvider initialized (model=${this.config.model})`);
   }
 
-  async transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+  async transcribe(
+    request: TranscriptionRequest,
+  ): Promise<TranscriptionResponse> {
     const startTime = Date.now();
 
     logger.info(`Groq transcribe called`, {
@@ -80,30 +82,30 @@ export class GroqProvider implements TranscriptionProvider {
       const formData = new FormData();
 
       // 音声ファイル
-      formData.append('file', request.audioData, {
+      formData.append("file", request.audioData, {
         filename: `audio.${request.audioFormat}`,
         contentType: this.getContentType(request.audioFormat),
       });
 
       // モデル（必須）
-      formData.append('model', this.config.model ?? 'whisper-large-v3');
+      formData.append("model", this.config.model ?? "whisper-large-v3");
 
       // 言語（オプション）
       if (request.language) {
-        formData.append('language', request.language);
+        formData.append("language", request.language);
       }
 
       // プロンプト（文脈や専門用語を指定）
       if (request.prompt) {
-        formData.append('prompt', request.prompt);
+        formData.append("prompt", request.prompt);
       }
 
       // レスポンス形式
-      formData.append('response_format', 'verbose_json');
+      formData.append("response_format", "verbose_json");
 
-      logger.debug('Sending request to Groq API...');
+      logger.debug("Sending request to Groq API...");
       const response = await this.executeWithRetry(async () => {
-        return await this.client.post('/audio/transcriptions', formData, {
+        return await this.client.post("/audio/transcriptions", formData, {
           headers: formData.getHeaders(),
         });
       });
@@ -125,17 +127,19 @@ export class GroqProvider implements TranscriptionProvider {
       };
     } catch (error) {
       const processingTimeMs = Date.now() - startTime;
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      
+      const message = error instanceof Error ? error.message : "Unknown error";
+
       // レート制限エラーの検出
-      const axiosError = error as { response?: { status?: number; data?: unknown } };
+      const axiosError = error as {
+        response?: { status?: number; data?: unknown };
+      };
       if (axiosError.response?.status === 429) {
-        logger.error('Groq API rate limit exceeded!', {
+        logger.error("Groq API rate limit exceeded!", {
           status: 429,
           data: axiosError.response.data,
         });
       } else {
-        logger.error('GroqProvider transcription failed:', { 
+        logger.error("GroqProvider transcription failed:", {
           error: message,
           status: axiosError.response?.status,
         });
@@ -144,7 +148,10 @@ export class GroqProvider implements TranscriptionProvider {
       return {
         success: false,
         error: {
-          code: axiosError.response?.status === 429 ? 'RATE_LIMIT' : 'TRANSCRIPTION_FAILED',
+          code:
+            axiosError.response?.status === 429
+              ? "RATE_LIMIT"
+              : "TRANSCRIPTION_FAILED",
           message,
         },
         processingTimeMs,
@@ -155,7 +162,7 @@ export class GroqProvider implements TranscriptionProvider {
   async healthCheck(): Promise<ProviderHealth> {
     try {
       // Groq API の models エンドポイントで確認
-      await this.client.get('/models', { timeout: 5000 });
+      await this.client.get("/models", { timeout: 5000 });
       this.isHealthy = true;
 
       return {
@@ -172,7 +179,7 @@ export class GroqProvider implements TranscriptionProvider {
         isHealthy: false,
         providerName: this.name,
         details: {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         },
       };
     }
@@ -184,14 +191,14 @@ export class GroqProvider implements TranscriptionProvider {
 
   private getContentType(format: string): string {
     switch (format) {
-      case 'ogg':
-        return 'audio/ogg';
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'webm':
-        return 'audio/webm';
+      case "ogg":
+        return "audio/ogg";
+      case "mp3":
+        return "audio/mpeg";
+      case "webm":
+        return "audio/webm";
       default:
-        return 'audio/wav';
+        return "audio/wav";
     }
   }
 
@@ -199,7 +206,7 @@ export class GroqProvider implements TranscriptionProvider {
    * segments から confidence を推定
    */
   private estimateConfidence(
-    segments?: Array<{ avg_logprob?: number }>
+    segments?: Array<{ avg_logprob?: number }>,
   ): number {
     if (!segments || segments.length === 0) {
       return 0.85; // Groq + large-v3 は高精度
@@ -212,9 +219,7 @@ export class GroqProvider implements TranscriptionProvider {
     return Math.min(1.0, Math.max(0.0, 1.0 + avgLogprob / 3));
   }
 
-  private async executeWithRetry<T>(
-    operation: () => Promise<T>
-  ): Promise<T> {
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null;
     let delay = this.config.retryDelay ?? 1000;
 
@@ -228,7 +233,9 @@ export class GroqProvider implements TranscriptionProvider {
           break;
         }
 
-        logger.warn(`Groq retry attempt ${attempt + 1}`, { error: lastError.message });
+        logger.warn(`Groq retry attempt ${attempt + 1}`, {
+          error: lastError.message,
+        });
         await this.sleep(delay);
         delay *= 2;
       }
@@ -241,4 +248,3 @@ export class GroqProvider implements TranscriptionProvider {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-

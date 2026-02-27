@@ -7,11 +7,12 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
-} from 'discord.js';
-import type { Command } from '../types/index.js';
-import { logger } from '../utils/logger.js';
+} from "discord.js";
+import type { Command } from "../types/index.js";
+import { logger } from "../utils/logger.js";
 // SQLite は条件付きインポート（メモリ節約）
-type SqliteStoreManager = import('../output/sqlite-store.js').SqliteStoreManager;
+type SqliteStoreManager =
+  import("../output/sqlite-store.js").SqliteStoreManager;
 
 // SQLite store manager instance (will be set from outside)
 let sqliteStoreManager: SqliteStoreManager | null = null;
@@ -19,7 +20,9 @@ let sqliteStoreManager: SqliteStoreManager | null = null;
 /**
  * SQLiteストアマネージャーを設定
  */
-export function setSqliteStoreManager(manager: SqliteStoreManager | null): void {
+export function setSqliteStoreManager(
+  manager: SqliteStoreManager | null,
+): void {
   sqliteStoreManager = manager;
 }
 
@@ -36,7 +39,7 @@ export function getSqliteStoreManager(): SqliteStoreManager | null {
 function formatTimestamp(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -44,12 +47,12 @@ function formatTimestamp(seconds: number): string {
  */
 function formatDate(isoString: string): string {
   const date = new Date(isoString);
-  return date.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+  return date.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -58,47 +61,48 @@ function formatDate(isoString: string): string {
  */
 export const searchCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('search')
-    .setDescription('過去の会話ログを検索します')
+    .setName("search")
+    .setDescription("過去の会話ログを検索します")
     .addStringOption((option) =>
       option
-        .setName('keyword')
-        .setDescription('検索キーワード')
-        .setRequired(true)
+        .setName("keyword")
+        .setDescription("検索キーワード")
+        .setRequired(true),
     )
     .addUserOption((option) =>
       option
-        .setName('user')
-        .setDescription('特定のユーザーに絞り込む')
-        .setRequired(false)
+        .setName("user")
+        .setDescription("特定のユーザーに絞り込む")
+        .setRequired(false),
     )
     .addIntegerOption((option) =>
       option
-        .setName('limit')
-        .setDescription('結果の最大件数（デフォルト: 10）')
+        .setName("limit")
+        .setDescription("結果の最大件数（デフォルト: 10）")
         .setRequired(false)
         .setMinValue(1)
-        .setMaxValue(50)
+        .setMaxValue(50),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
     // Check if SQLite is enabled
     if (!sqliteStoreManager) {
       await interaction.reply({
-        content: '❌ 検索機能は無効になっています。環境変数 `ENABLE_SQLITE=true` を設定してください。',
+        content:
+          "❌ 検索機能は無効になっています。環境変数 `ENABLE_SQLITE=true` を設定してください。",
         ephemeral: true,
       });
       return;
     }
 
-    const keyword = interaction.options.getString('keyword', true);
-    const user = interaction.options.getUser('user');
-    const limit = interaction.options.getInteger('limit') || 10;
+    const keyword = interaction.options.getString("keyword", true);
+    const user = interaction.options.getUser("user");
+    const limit = interaction.options.getInteger("limit") || 10;
     const guildId = interaction.guildId;
 
     if (!guildId) {
       await interaction.reply({
-        content: '❌ このコマンドはサーバー内でのみ使用できます。',
+        content: "❌ このコマンドはサーバー内でのみ使用できます。",
         ephemeral: true,
       });
       return;
@@ -107,7 +111,7 @@ export const searchCommand: Command = {
     // Check if this guild has any data
     if (!sqliteStoreManager.hasStore(guildId)) {
       await interaction.reply({
-        content: '🔍 このサーバーにはまだ文字起こしデータがありません。',
+        content: "🔍 このサーバーにはまだ文字起こしデータがありません。",
         ephemeral: true,
       });
       return;
@@ -118,7 +122,7 @@ export const searchCommand: Command = {
     try {
       // Get the store for this specific guild (isolated database)
       const sqliteStore = sqliteStoreManager.getStore(guildId);
-      
+
       const results = sqliteStore.search({
         keyword,
         userId: user?.id,
@@ -150,18 +154,18 @@ export const searchCommand: Command = {
         // Truncate long text
         let text = result.text;
         if (text.length > 100) {
-          text = text.substring(0, 100) + '...';
+          text = text.substring(0, 100) + "...";
         }
 
         // Highlight keyword in text
         const highlightedText = text.replace(
-          new RegExp(`(${escapeRegExp(keyword)})`, 'gi'),
-          '**$1**'
+          new RegExp(`(${escapeRegExp(keyword)})`, "gi"),
+          "**$1**",
         );
 
         embed.addFields({
           name: `${displayName} - ${date} [${timestamp}]`,
-          value: highlightedText || '(空)',
+          value: highlightedText || "(空)",
           inline: false,
         });
       }
@@ -174,16 +178,16 @@ export const searchCommand: Command = {
 
       await interaction.editReply({ embeds: [embed] });
 
-      logger.info('Search command executed', {
+      logger.info("Search command executed", {
         guildId,
         keyword,
         userId: user?.id,
         resultCount: results.length,
       });
     } catch (error) {
-      logger.error('Search command error', { error });
+      logger.error("Search command error", { error });
       await interaction.editReply({
-        content: '❌ 検索中にエラーが発生しました。',
+        content: "❌ 検索中にエラーが発生しました。",
       });
     }
   },
@@ -193,8 +197,7 @@ export const searchCommand: Command = {
  * 正規表現の特殊文字をエスケープ
  */
 function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export default searchCommand;
-

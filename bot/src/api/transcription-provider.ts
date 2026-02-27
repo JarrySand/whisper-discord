@@ -10,7 +10,7 @@
  */
 export interface TranscriptionRequest {
   audioData: Buffer;
-  audioFormat: 'ogg' | 'wav' | 'mp3' | 'webm';
+  audioFormat: "ogg" | "wav" | "mp3" | "webm";
   language?: string;
   // メタデータ（プロバイダーによっては使用しない）
   userId?: string;
@@ -85,7 +85,7 @@ export interface BaseProviderConfig {
  * ローカルまたは外部サーバーの faster-whisper API に接続
  */
 export interface SelfHostedWhisperConfig extends BaseProviderConfig {
-  type: 'self-hosted';
+  type: "self-hosted";
   baseUrl: string;
 }
 
@@ -96,9 +96,9 @@ export type LocalWhisperConfig = SelfHostedWhisperConfig;
  * OpenAI API 設定
  */
 export interface OpenAIConfig extends BaseProviderConfig {
-  type: 'openai';
+  type: "openai";
   apiKey: string;
-  model?: 'whisper-1';
+  model?: "whisper-1";
 }
 
 /**
@@ -106,13 +106,15 @@ export interface OpenAIConfig extends BaseProviderConfig {
  * OpenAI 互換 API で whisper-large-v3 を使用
  */
 export interface GroqConfig extends BaseProviderConfig {
-  type: 'groq';
+  type: "groq";
   apiKey: string;
-  model?: 'whisper-large-v3' | 'whisper-large-v3-turbo';
+  model?: "whisper-large-v3" | "whisper-large-v3-turbo";
 }
 
 /**
  * プロバイダー設定のユニオン型
  */
-export type ProviderConfig = SelfHostedWhisperConfig | OpenAIConfig | GroqConfig;
-
+export type ProviderConfig =
+  | SelfHostedWhisperConfig
+  | OpenAIConfig
+  | GroqConfig;

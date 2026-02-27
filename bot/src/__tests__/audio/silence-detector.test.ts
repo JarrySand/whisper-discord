@@ -1,15 +1,18 @@
 /**
  * T-2: 無音検知テスト - SilenceDetector
- * 
+ *
  * 目的: 誤分割が起きないか確認
- * 
+ *
  * テスト項目:
  * - 無音を正しく検出する
  * - 音声後に無音を検出するとセグメント化
  * - 短い無音では誤分割しない
  * - RMSSilenceDetector のテスト
  */
-import { SilenceDetector, RMSSilenceDetector } from '../../audio/silence-detector.js';
+import {
+  SilenceDetector,
+  RMSSilenceDetector,
+} from "../../audio/silence-detector.js";
 
 /**
  * 無音PCMデータを生成（16-bit, 16kHz）
@@ -52,16 +55,18 @@ function createLoudPcm(durationMs: number, amplitude = 10000): Buffer {
   for (let i = 0; i < samples; i++) {
     // サイン波を生成（440Hz）
     const freq = 440;
-    const value = Math.floor(amplitude * Math.sin((2 * Math.PI * freq * i) / sampleRate));
+    const value = Math.floor(
+      amplitude * Math.sin((2 * Math.PI * freq * i) / sampleRate),
+    );
     buffer.writeInt16LE(value, i * bytesPerSample);
   }
 
   return buffer;
 }
 
-describe('SilenceDetector', () => {
-  describe('T-2: 無音検知テスト', () => {
-    test('無音を正しく検出する', async () => {
+describe("SilenceDetector", () => {
+  describe("T-2: 無音検知テスト", () => {
+    test("無音を正しく検出する", async () => {
       const detector = new SilenceDetector({ amplitudeThreshold: 500 });
 
       // 最初の呼び出しで無音開始を記録
@@ -75,7 +80,7 @@ describe('SilenceDetector', () => {
       expect(silenceDuration).toBeGreaterThan(0);
     });
 
-    test('純粋な無音バッファでの検出', async () => {
+    test("純粋な無音バッファでの検出", async () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceRatio: 0.9,
@@ -92,7 +97,7 @@ describe('SilenceDetector', () => {
       expect(result).toBeGreaterThan(0);
     });
 
-    test('閾値以下のノイズも無音として検出する', async () => {
+    test("閾値以下のノイズも無音として検出する", async () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceRatio: 0.9,
@@ -109,7 +114,7 @@ describe('SilenceDetector', () => {
       expect(result).toBeGreaterThan(0);
     });
 
-    test('音声は無音として検出しない', () => {
+    test("音声は無音として検出しない", () => {
       const detector = new SilenceDetector({ amplitudeThreshold: 500 });
 
       const loudPcm = createLoudPcm(100, 10000);
@@ -118,7 +123,7 @@ describe('SilenceDetector', () => {
       expect(result).toBe(0);
     });
 
-    test('音声後に無音を検出するとセグメント化判定可能', async () => {
+    test("音声後に無音を検出するとセグメント化判定可能", async () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceDuration: 600, // 600ms
@@ -138,7 +143,7 @@ describe('SilenceDetector', () => {
       expect(detector.shouldSegment()).toBe(true);
     });
 
-    test('短い無音では誤分割しない', () => {
+    test("短い無音では誤分割しない", () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceDuration: 600, // 600ms
@@ -155,7 +160,7 @@ describe('SilenceDetector', () => {
       expect(detector.shouldSegment()).toBe(false);
     });
 
-    test('リセットで無音計測がクリアされる', () => {
+    test("リセットで無音計測がクリアされる", () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceDuration: 100,
@@ -172,8 +177,8 @@ describe('SilenceDetector', () => {
     });
   });
 
-  describe('設定管理', () => {
-    test('設定を更新できる', () => {
+  describe("設定管理", () => {
+    test("設定を更新できる", () => {
       const detector = new SilenceDetector();
       const originalConfig = detector.getConfig();
 
@@ -181,10 +186,12 @@ describe('SilenceDetector', () => {
       const updatedConfig = detector.getConfig();
 
       expect(updatedConfig.amplitudeThreshold).toBe(1000);
-      expect(updatedConfig.silenceDuration).toBe(originalConfig.silenceDuration);
+      expect(updatedConfig.silenceDuration).toBe(
+        originalConfig.silenceDuration,
+      );
     });
 
-    test('現在の設定を取得できる', () => {
+    test("現在の設定を取得できる", () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 1000,
         silenceDuration: 800,
@@ -200,7 +207,7 @@ describe('SilenceDetector', () => {
       expect(config.silenceRatio).toBe(0.95);
     });
 
-    test('デフォルト設定が適用される', () => {
+    test("デフォルト設定が適用される", () => {
       const detector = new SilenceDetector();
       const config = detector.getConfig();
 
@@ -211,8 +218,8 @@ describe('SilenceDetector', () => {
     });
   });
 
-  describe('エッジケース', () => {
-    test('空のバッファを処理できる', () => {
+  describe("エッジケース", () => {
+    test("空のバッファを処理できる", () => {
       const detector = new SilenceDetector();
       const emptyBuffer = Buffer.alloc(0);
 
@@ -220,14 +227,14 @@ describe('SilenceDetector', () => {
       expect(() => detector.analyze(emptyBuffer)).not.toThrow();
     });
 
-    test('非常に短いバッファを処理できる', () => {
+    test("非常に短いバッファを処理できる", () => {
       const detector = new SilenceDetector();
       const shortBuffer = Buffer.alloc(4); // 2サンプル
 
       expect(() => detector.analyze(shortBuffer)).not.toThrow();
     });
 
-    test('連続的な分析で正確な時間追跡', async () => {
+    test("連続的な分析で正確な時間追跡", async () => {
       const detector = new SilenceDetector({
         amplitudeThreshold: 500,
         silenceDuration: 200,
@@ -247,8 +254,8 @@ describe('SilenceDetector', () => {
   });
 });
 
-describe('RMSSilenceDetector', () => {
-  test('RMS計算による無音検出', async () => {
+describe("RMSSilenceDetector", () => {
+  test("RMS計算による無音検出", async () => {
     const detector = new RMSSilenceDetector(0.02, 600);
 
     // 最初の呼び出しで無音開始を記録
@@ -262,7 +269,7 @@ describe('RMSSilenceDetector', () => {
     expect(result).toBeGreaterThan(0);
   });
 
-  test('音声はRMSで無音として検出しない', () => {
+  test("音声はRMSで無音として検出しない", () => {
     const detector = new RMSSilenceDetector(0.02, 600);
 
     const loudPcm = createLoudPcm(100, 10000);
@@ -271,7 +278,7 @@ describe('RMSSilenceDetector', () => {
     expect(result).toBe(0);
   });
 
-  test('セグメント化判定', async () => {
+  test("セグメント化判定", async () => {
     const detector = new RMSSilenceDetector(0.02, 200);
 
     // 無音を検出開始
@@ -282,7 +289,7 @@ describe('RMSSilenceDetector', () => {
     expect(detector.shouldSegment()).toBe(true);
   });
 
-  test('リセット', () => {
+  test("リセット", () => {
     const detector = new RMSSilenceDetector(0.02, 100);
 
     detector.analyzeRMS(createSilentPcm(100));
@@ -291,11 +298,10 @@ describe('RMSSilenceDetector', () => {
     expect(detector.shouldSegment()).toBe(false);
   });
 
-  test('空バッファの処理', () => {
+  test("空バッファの処理", () => {
     const detector = new RMSSilenceDetector();
     const emptyBuffer = Buffer.alloc(0);
 
     expect(() => detector.analyzeRMS(emptyBuffer)).not.toThrow();
   });
 });
-
