@@ -4,7 +4,7 @@
  */
 
 // Winston ロガーをモック化（テスト中のログ出力を抑制）
-jest.mock('../utils/logger.js', () => ({
+jest.mock("../utils/logger.js", () => ({
   logger: {
     debug: jest.fn(),
     info: jest.fn(),
@@ -20,4 +20,3 @@ jest.setTimeout(30000);
 afterEach(() => {
   jest.clearAllMocks();
 });
-

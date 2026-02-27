@@ -4,17 +4,17 @@
  * - 並行処理制御
  * - リトライ処理
  */
-import { EventEmitter } from 'events';
-import { logger } from '../utils/logger.js';
-import type { WhisperClient } from './whisper-client.js';
-import type { CircuitBreaker } from './circuit-breaker.js';
+import { EventEmitter } from "events";
+import { logger } from "../utils/logger.js";
+import type { WhisperClient } from "./whisper-client.js";
+import type { CircuitBreaker } from "./circuit-breaker.js";
 import type {
   AudioSegment,
   QueueConfig,
   QueueItem,
   QueueStatus,
   TranscribeResponse,
-} from '../types/index.js';
+} from "../types/index.js";
 
 /**
  * プロンプト取得関数の型
@@ -41,7 +41,7 @@ export class TranscriptionQueue extends EventEmitter {
     whisperClient: WhisperClient,
     config: Partial<QueueConfig> = {},
     circuitBreaker: CircuitBreaker | null = null,
-    promptProvider: PromptProvider | null = null
+    promptProvider: PromptProvider | null = null,
   ) {
     super();
     this.whisperClient = whisperClient;
@@ -50,11 +50,11 @@ export class TranscriptionQueue extends EventEmitter {
     this.config = {
       maxSize: config.maxSize ?? 100,
       maxRetries: config.maxRetries ?? 3,
-      concurrency: config.concurrency ?? 1,  // レート制限対策: 1つずつ処理
-      processingTimeout: config.processingTimeout ?? 60000,  // タイムアウト短縮
+      concurrency: config.concurrency ?? 1, // レート制限対策: 1つずつ処理
+      processingTimeout: config.processingTimeout ?? 60000, // タイムアウト短縮
     };
 
-    logger.debug('TranscriptionQueue initialized', { config: this.config });
+    logger.debug("TranscriptionQueue initialized", { config: this.config });
   }
 
   /**
@@ -66,7 +66,7 @@ export class TranscriptionQueue extends EventEmitter {
       const removed = this.queue.shift();
       if (removed) {
         logger.warn(`Queue full, dropping oldest segment: ${removed.id}`);
-        this.emit('dropped', removed);
+        this.emit("dropped", removed);
       }
     }
 
@@ -90,7 +90,7 @@ export class TranscriptionQueue extends EventEmitter {
       queueLength: this.queue.length,
       priority: item.priority,
     });
-    this.emit('enqueued', item);
+    this.emit("enqueued", item);
 
     // 処理開始
     this.processNext();
@@ -110,11 +110,13 @@ export class TranscriptionQueue extends EventEmitter {
    */
   private async processNext(): Promise<void> {
     if (!this.isRunning) {
-      logger.debug('Queue not running, skipping processNext');
+      logger.debug("Queue not running, skipping processNext");
       return;
     }
     if (this.processing.size >= this.config.concurrency) {
-      logger.debug(`Queue at max concurrency (${this.processing.size}/${this.config.concurrency}), waiting`);
+      logger.debug(
+        `Queue at max concurrency (${this.processing.size}/${this.config.concurrency}), waiting`,
+      );
       return;
     }
     if (this.queue.length === 0) {
@@ -130,7 +132,7 @@ export class TranscriptionQueue extends EventEmitter {
     if (elapsed < this.minRequestInterval) {
       const waitTime = this.minRequestInterval - elapsed;
       logger.debug(`Rate limit: waiting ${waitTime}ms before next request`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
     this.lastRequestTime = Date.now();
 
@@ -148,9 +150,9 @@ export class TranscriptionQueue extends EventEmitter {
           text: result.data?.text.substring(0, 50),
           processingTime: result.data?.processing_time_ms,
         });
-        this.emit('completed', item, result);
+        this.emit("completed", item, result);
       } else {
-        throw new Error(result.error?.message ?? 'Unknown error');
+        throw new Error(result.error?.message ?? "Unknown error");
       }
     } catch (error) {
       this.processing.delete(item.id);
@@ -168,8 +170,8 @@ export class TranscriptionQueue extends EventEmitter {
     // タイムアウト設定
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(
-        () => reject(new Error('Processing timeout')),
-        this.config.processingTimeout
+        () => reject(new Error("Processing timeout")),
+        this.config.processingTimeout,
       );
     });
 
@@ -212,16 +214,16 @@ export class TranscriptionQueue extends EventEmitter {
       this.queue.unshift(item);
       logger.warn(
         `Retrying segment: ${item.id} (${item.retryCount}/${this.config.maxRetries})`,
-        { error: error.message }
+        { error: error.message },
       );
-      this.emit('retry', item, error);
+      this.emit("retry", item, error);
     } else {
       // 最終失敗
       logger.error(`Segment failed permanently: ${item.id}`, {
         error: error.message,
         retries: item.retryCount,
       });
-      this.emit('failed', item, error);
+      this.emit("failed", item, error);
     }
   }
 
@@ -230,12 +232,12 @@ export class TranscriptionQueue extends EventEmitter {
    */
   start(): void {
     if (this.isRunning) {
-      logger.warn('TranscriptionQueue is already running');
+      logger.warn("TranscriptionQueue is already running");
       return;
     }
 
     this.isRunning = true;
-    logger.info('TranscriptionQueue started');
+    logger.info("TranscriptionQueue started");
 
     // 並行処理を開始
     for (let i = 0; i < this.config.concurrency; i++) {
@@ -248,7 +250,7 @@ export class TranscriptionQueue extends EventEmitter {
    */
   stop(): void {
     this.isRunning = false;
-    logger.info('TranscriptionQueue stopped');
+    logger.info("TranscriptionQueue stopped");
   }
 
   /**
@@ -258,7 +260,7 @@ export class TranscriptionQueue extends EventEmitter {
     const count = this.queue.length;
     this.queue = [];
     logger.info(`Queue cleared: ${count} items removed`);
-    this.emit('cleared', count);
+    this.emit("cleared", count);
   }
 
   /**
@@ -281,6 +283,3 @@ export class TranscriptionQueue extends EventEmitter {
 }
 
 export default TranscriptionQueue;
-
-
-

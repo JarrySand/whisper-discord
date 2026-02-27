@@ -1,6 +1,6 @@
 /**
  * WhisperClient テスト
- * 
+ *
  * テスト項目:
  * - 初期化
  * - 単一セグメント文字起こし
@@ -9,13 +9,13 @@
  * - エラーハンドリング
  * - ヘルスチェック
  */
-import axios, { AxiosError } from 'axios';
-import { WhisperClient } from '../../api/whisper-client.js';
-import type { TranscribeRequest } from '../../types/index.js';
+import axios, { AxiosError } from "axios";
+import { WhisperClient } from "../../api/whisper-client.js";
+import type { TranscribeRequest } from "../../types/index.js";
 
 // axiosをモック化
-jest.mock('axios', () => {
-  const actualAxios = jest.requireActual('axios');
+jest.mock("axios", () => {
+  const actualAxios = jest.requireActual("axios");
   return {
     ...actualAxios,
     default: {
@@ -30,7 +30,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 /**
  * AxiosErrorをシミュレート
  */
-function createAxiosError(status: number, message = 'Error'): AxiosError {
+function createAxiosError(status: number, message = "Error"): AxiosError {
   const error = new Error(message) as AxiosError;
   error.isAxiosError = true;
   error.response = {
@@ -48,22 +48,24 @@ function createAxiosError(status: number, message = 'Error'): AxiosError {
 /**
  * モックのリクエストを作成
  */
-function createMockRequest(overrides: Partial<TranscribeRequest> = {}): TranscribeRequest {
+function createMockRequest(
+  overrides: Partial<TranscribeRequest> = {},
+): TranscribeRequest {
   const now = Date.now();
   return {
-    audioData: Buffer.from('mock-audio-data'),
-    audioFormat: 'ogg',
-    userId: 'user-1',
-    username: 'testuser',
-    displayName: 'Test User',
+    audioData: Buffer.from("mock-audio-data"),
+    audioFormat: "ogg",
+    userId: "user-1",
+    username: "testuser",
+    displayName: "Test User",
     startTs: now - 3000,
     endTs: now,
-    language: 'ja',
+    language: "ja",
     ...overrides,
   };
 }
 
-describe('WhisperClient', () => {
+describe("WhisperClient", () => {
   let mockAxiosInstance: {
     post: jest.Mock;
     get: jest.Mock;
@@ -74,15 +76,17 @@ describe('WhisperClient', () => {
       post: jest.fn(),
       get: jest.fn(),
     };
-    mockedAxios.create.mockReturnValue(mockAxiosInstance as unknown as ReturnType<typeof axios.create>);
+    mockedAxios.create.mockReturnValue(
+      mockAxiosInstance as unknown as ReturnType<typeof axios.create>,
+    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('初期化', () => {
-    test('デフォルト設定で初期化される', () => {
+  describe("初期化", () => {
+    test("デフォルト設定で初期化される", () => {
       const client = new WhisperClient();
       const config = client.getConfig();
 
@@ -91,46 +95,46 @@ describe('WhisperClient', () => {
       expect(config.retryCount).toBeDefined();
     });
 
-    test('カスタム設定で初期化される', () => {
+    test("カスタム設定で初期化される", () => {
       const client = new WhisperClient({
-        baseUrl: 'http://custom-api:9000',
+        baseUrl: "http://custom-api:9000",
         timeout: 60000,
         retryCount: 5,
         retryDelay: 2000,
       });
 
       const config = client.getConfig();
-      expect(config.baseUrl).toBe('http://custom-api:9000');
+      expect(config.baseUrl).toBe("http://custom-api:9000");
       expect(config.timeout).toBe(60000);
       expect(config.retryCount).toBe(5);
       expect(config.retryDelay).toBe(2000);
     });
 
-    test('axios インスタンスが作成される', () => {
-      new WhisperClient({ baseUrl: 'http://test:8000' });
+    test("axios インスタンスが作成される", () => {
+      new WhisperClient({ baseUrl: "http://test:8000" });
 
       expect(mockedAxios.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          baseURL: 'http://test:8000',
-        })
+          baseURL: "http://test:8000",
+        }),
       );
     });
   });
 
-  describe('transcribe', () => {
-    test('単一セグメントを文字起こしできる', async () => {
+  describe("transcribe", () => {
+    test("単一セグメントを文字起こしできる", async () => {
       const mockResponse = {
         data: {
           success: true,
           data: {
-            user_id: 'user-1',
-            username: 'testuser',
-            display_name: 'Test User',
-            text: 'こんにちは',
+            user_id: "user-1",
+            username: "testuser",
+            display_name: "Test User",
+            text: "こんにちは",
             start_ts: Date.now() - 3000,
             end_ts: Date.now(),
             duration_ms: 3000,
-            language: 'ja',
+            language: "ja",
             confidence: 0.95,
             processing_time_ms: 500,
           },
@@ -143,16 +147,16 @@ describe('WhisperClient', () => {
       const result = await client.transcribe(createMockRequest());
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/transcribe',
+        "/transcribe",
         expect.any(Object),
         expect.objectContaining({
           headers: expect.any(Object),
-        })
+        }),
       );
       expect(result).toEqual(mockResponse.data);
     });
 
-    test('displayNameがない場合もリクエストできる', async () => {
+    test("displayNameがない場合もリクエストできる", async () => {
       mockAxiosInstance.post.mockResolvedValueOnce({
         data: { success: true, data: {} },
       });
@@ -164,8 +168,8 @@ describe('WhisperClient', () => {
     });
   });
 
-  describe('transcribeBatch', () => {
-    test('空の配列では空の結果を返す', async () => {
+  describe("transcribeBatch", () => {
+    test("空の配列では空の結果を返す", async () => {
       const client = new WhisperClient();
       const result = await client.transcribeBatch([]);
 
@@ -173,14 +177,14 @@ describe('WhisperClient', () => {
       expect(mockAxiosInstance.post).not.toHaveBeenCalled();
     });
 
-    test('複数セグメントをバッチ処理できる', async () => {
+    test("複数セグメントをバッチ処理できる", async () => {
       const mockResponse = {
         data: {
           success: true,
           data: {
             results: [
-              { success: true, data: { text: 'テスト1' } },
-              { success: true, data: { text: 'テスト2' } },
+              { success: true, data: { text: "テスト1" } },
+              { success: true, data: { text: "テスト2" } },
             ],
           },
         },
@@ -190,28 +194,28 @@ describe('WhisperClient', () => {
 
       const client = new WhisperClient({ retryCount: 0 });
       const result = await client.transcribeBatch([
-        createMockRequest({ userId: 'user-1' }),
-        createMockRequest({ userId: 'user-2' }),
+        createMockRequest({ userId: "user-1" }),
+        createMockRequest({ userId: "user-2" }),
       ]);
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/transcribe/batch',
+        "/transcribe/batch",
         expect.any(Object),
         expect.objectContaining({
           headers: expect.any(Object),
-        })
+        }),
       );
       expect(result).toEqual(mockResponse.data.data.results);
     });
   });
 
-  describe('リトライロジック', () => {
-    test('一時的なエラーでリトライする', async () => {
+  describe("リトライロジック", () => {
+    test("一時的なエラーでリトライする", async () => {
       // 最初は失敗、2回目で成功
       mockAxiosInstance.post
-        .mockRejectedValueOnce(createAxiosError(500, 'Server error'))
+        .mockRejectedValueOnce(createAxiosError(500, "Server error"))
         .mockResolvedValueOnce({
-          data: { success: true, data: { text: 'OK' } },
+          data: { success: true, data: { text: "OK" } },
         });
 
       const client = new WhisperClient({
@@ -225,8 +229,10 @@ describe('WhisperClient', () => {
       expect(result.success).toBe(true);
     });
 
-    test('リトライ回数を超えるとエラーを投げる', async () => {
-      mockAxiosInstance.post.mockRejectedValue(createAxiosError(500, 'Server error'));
+    test("リトライ回数を超えるとエラーを投げる", async () => {
+      mockAxiosInstance.post.mockRejectedValue(
+        createAxiosError(500, "Server error"),
+      );
 
       const client = new WhisperClient({
         retryCount: 2,
@@ -237,8 +243,10 @@ describe('WhisperClient', () => {
       expect(mockAxiosInstance.post).toHaveBeenCalledTimes(3); // 初回 + 2リトライ
     });
 
-    test('4xxエラー（400, 401, 403, 404）はリトライしない', async () => {
-      mockAxiosInstance.post.mockRejectedValue(createAxiosError(400, 'Bad request'));
+    test("4xxエラー（400, 401, 403, 404）はリトライしない", async () => {
+      mockAxiosInstance.post.mockRejectedValue(
+        createAxiosError(400, "Bad request"),
+      );
 
       const client = new WhisperClient({
         retryCount: 3,
@@ -249,9 +257,9 @@ describe('WhisperClient', () => {
       expect(mockAxiosInstance.post).toHaveBeenCalledTimes(1); // リトライしない
     });
 
-    test('408 (Timeout) はリトライする', async () => {
+    test("408 (Timeout) はリトライする", async () => {
       mockAxiosInstance.post
-        .mockRejectedValueOnce(createAxiosError(408, 'Request Timeout'))
+        .mockRejectedValueOnce(createAxiosError(408, "Request Timeout"))
         .mockResolvedValueOnce({
           data: { success: true, data: {} },
         });
@@ -267,9 +275,9 @@ describe('WhisperClient', () => {
       expect(result.success).toBe(true);
     });
 
-    test('429 (Too Many Requests) はリトライする', async () => {
+    test("429 (Too Many Requests) はリトライする", async () => {
       mockAxiosInstance.post
-        .mockRejectedValueOnce(createAxiosError(429, 'Too Many Requests'))
+        .mockRejectedValueOnce(createAxiosError(429, "Too Many Requests"))
         .mockResolvedValueOnce({
           data: { success: true, data: {} },
         });
@@ -285,9 +293,11 @@ describe('WhisperClient', () => {
       expect(result.success).toBe(true);
     });
 
-    test('バックオフ係数でリトライ間隔が増加する', async () => {
+    test("バックオフ係数でリトライ間隔が増加する", async () => {
       // 3回失敗
-      mockAxiosInstance.post.mockRejectedValue(createAxiosError(500, 'Server error'));
+      mockAxiosInstance.post.mockRejectedValue(
+        createAxiosError(500, "Server error"),
+      );
 
       const client = new WhisperClient({
         retryCount: 2,
@@ -304,11 +314,11 @@ describe('WhisperClient', () => {
     });
   });
 
-  describe('healthCheck', () => {
-    test('正常なヘルスチェック', async () => {
+  describe("healthCheck", () => {
+    test("正常なヘルスチェック", async () => {
       const mockResponse = {
         data: {
-          status: 'healthy',
+          status: "healthy",
           timestamp: Date.now(),
         },
       };
@@ -318,15 +328,15 @@ describe('WhisperClient', () => {
       const client = new WhisperClient();
       const result = await client.healthCheck();
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/health', {
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith("/health", {
         timeout: 5000,
       });
-      expect(result.status).toBe('healthy');
+      expect(result.status).toBe("healthy");
     });
 
-    test('ヘルスチェック成功でisHealthyがtrueになる', async () => {
+    test("ヘルスチェック成功でisHealthyがtrueになる", async () => {
       mockAxiosInstance.get.mockResolvedValueOnce({
-        data: { status: 'healthy' },
+        data: { status: "healthy" },
       });
 
       const client = new WhisperClient();
@@ -337,8 +347,10 @@ describe('WhisperClient', () => {
       expect(status.lastCheck).toBeGreaterThan(0);
     });
 
-    test('ヘルスチェック失敗でisHealthyがfalseになる', async () => {
-      mockAxiosInstance.get.mockRejectedValueOnce(new Error('Connection refused'));
+    test("ヘルスチェック失敗でisHealthyがfalseになる", async () => {
+      mockAxiosInstance.get.mockRejectedValueOnce(
+        new Error("Connection refused"),
+      );
 
       const client = new WhisperClient();
 
@@ -348,9 +360,9 @@ describe('WhisperClient', () => {
       expect(status.isHealthy).toBe(false);
     });
 
-    test('unhealthyステータスでもisHealthyがfalseになる', async () => {
+    test("unhealthyステータスでもisHealthyがfalseになる", async () => {
       mockAxiosInstance.get.mockResolvedValueOnce({
-        data: { status: 'unhealthy' },
+        data: { status: "unhealthy" },
       });
 
       const client = new WhisperClient();
@@ -361,8 +373,8 @@ describe('WhisperClient', () => {
     });
   });
 
-  describe('getHealthStatus', () => {
-    test('初期状態ではhealthyでlastCheckが0', () => {
+  describe("getHealthStatus", () => {
+    test("初期状態ではhealthyでlastCheckが0", () => {
       const client = new WhisperClient();
       const status = client.getHealthStatus();
 
@@ -371,4 +383,3 @@ describe('WhisperClient', () => {
     });
   });
 });
-

@@ -6,7 +6,7 @@
  * - 意味不明な繰り返しパターン
  * - 特定の定型フレーズ（字幕提供、ご視聴ありがとうございましたなど）
  */
-import { logger } from '../utils/logger.js';
+import { logger } from "../utils/logger.js";
 
 export interface HallucinationFilterConfig {
   enabled: boolean;
@@ -19,7 +19,7 @@ const HALLUCINATION_PATTERNS: RegExp[] = [
   // 典型的なハルシネーション（無音時に頻発）
   /^ありがとうございました[。.]?$/,
   /^ありがとうございます[。.]?$/,
-  /ありがとうございました[。.]?$/,  // 文末のありがとうございましたも検出
+  /ありがとうございました[。.]?$/, // 文末のありがとうございましたも検出
   /^字幕提供.*$/,
   /^ご視聴ありがとうございました.*$/,
   /^チャンネル登録.*$/,
@@ -71,7 +71,10 @@ export class HallucinationFilter {
   /**
    * 繰り返しパターンを検出
    */
-  detectRepetition(text: string): { isRepetition: boolean; phrase: string | null } {
+  detectRepetition(text: string): {
+    isRepetition: boolean;
+    phrase: string | null;
+  } {
     if (!text || text.length < 6) {
       return { isRepetition: false, phrase: null };
     }
@@ -90,7 +93,8 @@ export class HallucinationFilter {
     // サブストリングの繰り返しを検出
     for (
       let phraseLen = 2;
-      phraseLen < Math.min(this.maxRepetitionLength + 1, Math.floor(t.length / 2) + 1);
+      phraseLen <
+      Math.min(this.maxRepetitionLength + 1, Math.floor(t.length / 2) + 1);
       phraseLen++
     ) {
       const phrase = t.substring(0, phraseLen);
@@ -143,8 +147,10 @@ export class HallucinationFilter {
     if (this.detectPatternHallucination(text)) {
       this.stats.totalFiltered++;
       this.stats.patternFiltered++;
-      logger.debug(`Pattern hallucination detected: ${text.substring(0, 50)}...`);
-      return { text: '', wasFiltered: true, reason: 'pattern_match' };
+      logger.debug(
+        `Pattern hallucination detected: ${text.substring(0, 50)}...`,
+      );
+      return { text: "", wasFiltered: true, reason: "pattern_match" };
     }
 
     // 繰り返し検出
@@ -153,7 +159,7 @@ export class HallucinationFilter {
       this.stats.totalFiltered++;
       this.stats.repetitionFiltered++;
       logger.debug(
-        `Repetition hallucination detected: '${phrase}' in '${text.substring(0, 50)}...'`
+        `Repetition hallucination detected: '${phrase}' in '${text.substring(0, 50)}...'`,
       );
 
       // 繰り返されたフレーズを1つだけ残す
@@ -165,7 +171,7 @@ export class HallucinationFilter {
         };
       }
 
-      return { text: '', wasFiltered: true, reason: 'repetition' };
+      return { text: "", wasFiltered: true, reason: "repetition" };
     }
 
     return { text, wasFiltered: false, reason: null };
@@ -201,4 +207,3 @@ export class HallucinationFilter {
     };
   }
 }
-

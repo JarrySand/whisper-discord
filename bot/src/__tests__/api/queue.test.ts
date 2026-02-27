@@ -1,6 +1,6 @@
 /**
  * TranscriptionQueue テスト
- * 
+ *
  * テスト項目:
  * - セグメントの追加と優先度
  * - 並行処理制御
@@ -8,26 +8,28 @@
  * - キューのサイズ制限
  * - イベント発火
  */
-import { TranscriptionQueue } from '../../api/queue.js';
-import { CircuitBreaker } from '../../api/circuit-breaker.js';
-import type { WhisperClient } from '../../api/whisper-client.js';
-import type { AudioSegment, TranscribeResponse } from '../../types/index.js';
+import { TranscriptionQueue } from "../../api/queue.js";
+import { CircuitBreaker } from "../../api/circuit-breaker.js";
+import type { WhisperClient } from "../../api/whisper-client.js";
+import type { AudioSegment, TranscribeResponse } from "../../types/index.js";
 
 /**
  * モックのAudioSegmentを作成
  */
-function createMockSegment(overrides: Partial<AudioSegment> = {}): AudioSegment {
+function createMockSegment(
+  overrides: Partial<AudioSegment> = {},
+): AudioSegment {
   const now = Date.now();
   return {
     id: `seg-${Math.random().toString(36).slice(2, 10)}`,
-    userId: 'user-1',
-    username: 'testuser',
-    displayName: 'Test User',
+    userId: "user-1",
+    username: "testuser",
+    displayName: "Test User",
     startTimestamp: overrides.startTimestamp ?? now - 3000,
     endTimestamp: overrides.endTimestamp ?? now,
     duration: overrides.duration ?? 3000,
-    audioData: Buffer.from('mock-audio'),
-    audioFormat: 'ogg',
+    audioData: Buffer.from("mock-audio"),
+    audioFormat: "ogg",
     sampleRate: 16000,
     channels: 1,
     bitrate: 32000,
@@ -39,7 +41,7 @@ function createMockSegment(overrides: Partial<AudioSegment> = {}): AudioSegment 
  * モックのWhisperClientを作成
  */
 function createMockWhisperClient(
-  options: { delay?: number; shouldFail?: boolean } = {}
+  options: { delay?: number; shouldFail?: boolean } = {},
 ): jest.Mocked<WhisperClient> {
   return {
     transcribe: jest.fn().mockImplementation(async () => {
@@ -49,33 +51,33 @@ function createMockWhisperClient(
       if (options.shouldFail) {
         return {
           success: false,
-          error: { code: 'ERROR', message: 'Mock error' },
+          error: { code: "ERROR", message: "Mock error" },
         } as TranscribeResponse;
       }
       return {
         success: true,
         data: {
-          user_id: 'user-1',
-          username: 'testuser',
-          display_name: 'Test User',
-          text: 'こんにちは',
+          user_id: "user-1",
+          username: "testuser",
+          display_name: "Test User",
+          text: "こんにちは",
           start_ts: Date.now() - 3000,
           end_ts: Date.now(),
           duration_ms: 3000,
-          language: 'ja',
+          language: "ja",
           confidence: 0.95,
           processing_time_ms: 500,
         },
       } as TranscribeResponse;
     }),
     healthCheck: jest.fn(),
-    getBaseUrl: jest.fn().mockReturnValue('http://localhost:8000'),
+    getBaseUrl: jest.fn().mockReturnValue("http://localhost:8000"),
   } as unknown as jest.Mocked<WhisperClient>;
 }
 
-describe('TranscriptionQueue', () => {
-  describe('初期化', () => {
-    test('正常に初期化される', () => {
+describe("TranscriptionQueue", () => {
+  describe("初期化", () => {
+    test("正常に初期化される", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -85,7 +87,7 @@ describe('TranscriptionQueue', () => {
       expect(status.isRunning).toBe(false);
     });
 
-    test('カスタム設定が適用される', () => {
+    test("カスタム設定が適用される", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient, {
         maxSize: 50,
@@ -100,8 +102,8 @@ describe('TranscriptionQueue', () => {
     });
   });
 
-  describe('エンキュー', () => {
-    test('セグメントをキューに追加できる', () => {
+  describe("エンキュー", () => {
+    test("セグメントをキューに追加できる", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -114,7 +116,7 @@ describe('TranscriptionQueue', () => {
       expect(status.queued).toBe(1);
     });
 
-    test('優先度順に並ぶ（新しいセグメントが優先）', () => {
+    test("優先度順に並ぶ（新しいセグメントが優先）", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -129,7 +131,7 @@ describe('TranscriptionQueue', () => {
       expect(status.queued).toBe(2);
     });
 
-    test('カスタム優先度を指定できる', () => {
+    test("カスタム優先度を指定できる", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -143,12 +145,12 @@ describe('TranscriptionQueue', () => {
       expect(status.queued).toBe(2);
     });
 
-    test('enqueuedイベントが発火する', () => {
+    test("enqueuedイベントが発火する", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
       let enqueuedItem: unknown = null;
 
-      queue.on('enqueued', (item) => {
+      queue.on("enqueued", (item) => {
         enqueuedItem = item;
       });
 
@@ -159,8 +161,8 @@ describe('TranscriptionQueue', () => {
     });
   });
 
-  describe('キューサイズ制限', () => {
-    test('最大サイズを超えると古いものが削除される', () => {
+  describe("キューサイズ制限", () => {
+    test("最大サイズを超えると古いものが削除される", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient, { maxSize: 3 });
 
@@ -174,12 +176,12 @@ describe('TranscriptionQueue', () => {
       expect(status.queued).toBe(3);
     });
 
-    test('droppedイベントが発火する', () => {
+    test("droppedイベントが発火する", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient, { maxSize: 2 });
       let droppedItem: unknown = null;
 
-      queue.on('dropped', (item) => {
+      queue.on("dropped", (item) => {
         droppedItem = item;
       });
 
@@ -191,8 +193,8 @@ describe('TranscriptionQueue', () => {
     });
   });
 
-  describe('処理開始/停止', () => {
-    test('start()でisRunningがtrueになる', () => {
+  describe("処理開始/停止", () => {
+    test("start()でisRunningがtrueになる", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -203,7 +205,7 @@ describe('TranscriptionQueue', () => {
       queue.stop();
     });
 
-    test('stop()でisRunningがfalseになる', () => {
+    test("stop()でisRunningがfalseになる", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -213,12 +215,12 @@ describe('TranscriptionQueue', () => {
       expect(queue.getStatus().isRunning).toBe(false);
     });
 
-    test('処理が正常に完了する', async () => {
+    test("処理が正常に完了する", async () => {
       const mockClient = createMockWhisperClient({ delay: 10 });
       const queue = new TranscriptionQueue(mockClient);
       let completed = false;
 
-      queue.on('completed', () => {
+      queue.on("completed", () => {
         completed = true;
       });
 
@@ -233,12 +235,12 @@ describe('TranscriptionQueue', () => {
       queue.stop();
     });
 
-    test('completedイベントに結果が含まれる', async () => {
+    test("completedイベントに結果が含まれる", async () => {
       const mockClient = createMockWhisperClient({ delay: 10 });
       const queue = new TranscriptionQueue(mockClient);
       let result: TranscribeResponse | undefined;
 
-      queue.on('completed', (_item, res: TranscribeResponse) => {
+      queue.on("completed", (_item, res: TranscribeResponse) => {
         result = res;
       });
 
@@ -249,14 +251,14 @@ describe('TranscriptionQueue', () => {
 
       expect(result).toBeDefined();
       expect(result!.success).toBe(true);
-      expect(result!.data?.text).toBe('こんにちは');
+      expect(result!.data?.text).toBe("こんにちは");
 
       queue.stop();
     });
   });
 
-  describe('並行処理', () => {
-    test('concurrency設定に従って並行処理', async () => {
+  describe("並行処理", () => {
+    test("concurrency設定に従って並行処理", async () => {
       const mockClient = createMockWhisperClient({ delay: 100 });
       const queue = new TranscriptionQueue(mockClient, { concurrency: 2 });
 
@@ -278,13 +280,16 @@ describe('TranscriptionQueue', () => {
     });
   });
 
-  describe('リトライ処理', () => {
-    test('失敗時にリトライされる', async () => {
-      const mockClient = createMockWhisperClient({ shouldFail: true, delay: 10 });
+  describe("リトライ処理", () => {
+    test("失敗時にリトライされる", async () => {
+      const mockClient = createMockWhisperClient({
+        shouldFail: true,
+        delay: 10,
+      });
       const queue = new TranscriptionQueue(mockClient, { maxRetries: 2 });
       let retryCount = 0;
 
-      queue.on('retry', () => {
+      queue.on("retry", () => {
         retryCount++;
       });
 
@@ -299,12 +304,15 @@ describe('TranscriptionQueue', () => {
       queue.stop();
     }, 10000);
 
-    test('最大リトライ回数を超えるとfailedイベント', async () => {
-      const mockClient = createMockWhisperClient({ shouldFail: true, delay: 10 });
+    test("最大リトライ回数を超えるとfailedイベント", async () => {
+      const mockClient = createMockWhisperClient({
+        shouldFail: true,
+        delay: 10,
+      });
       const queue = new TranscriptionQueue(mockClient, { maxRetries: 1 });
       let failed = false;
 
-      queue.on('failed', () => {
+      queue.on("failed", () => {
         failed = true;
       });
 
@@ -320,8 +328,8 @@ describe('TranscriptionQueue', () => {
     }, 15000);
   });
 
-  describe('サーキットブレーカー連携', () => {
-    test('サーキットブレーカーと連携できる', () => {
+  describe("サーキットブレーカー連携", () => {
+    test("サーキットブレーカーと連携できる", () => {
       const mockClient = createMockWhisperClient();
       const circuitBreaker = new CircuitBreaker();
       const queue = new TranscriptionQueue(mockClient, {}, circuitBreaker);
@@ -329,7 +337,7 @@ describe('TranscriptionQueue', () => {
       expect(queue.getStatus().queued).toBe(0);
     });
 
-    test('サーキットブレーカー経由で処理される', async () => {
+    test("サーキットブレーカー経由で処理される", async () => {
       const mockClient = createMockWhisperClient({ delay: 10 });
       const circuitBreaker = new CircuitBreaker();
       const queue = new TranscriptionQueue(mockClient, {}, circuitBreaker);
@@ -346,8 +354,8 @@ describe('TranscriptionQueue', () => {
     });
   });
 
-  describe('クリア', () => {
-    test('キューをクリアできる', () => {
+  describe("クリア", () => {
+    test("キューをクリアできる", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
 
@@ -361,12 +369,12 @@ describe('TranscriptionQueue', () => {
       expect(queue.getStatus().queued).toBe(0);
     });
 
-    test('clearedイベントが発火する', () => {
+    test("clearedイベントが発火する", () => {
       const mockClient = createMockWhisperClient();
       const queue = new TranscriptionQueue(mockClient);
       let clearedCount = 0;
 
-      queue.on('cleared', (count) => {
+      queue.on("cleared", (count) => {
         clearedCount = count;
       });
 
@@ -378,4 +386,3 @@ describe('TranscriptionQueue', () => {
     });
   });
 });
-

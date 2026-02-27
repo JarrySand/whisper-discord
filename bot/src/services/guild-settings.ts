@@ -1,6 +1,6 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import { logger } from '../utils/logger.js';
+import { promises as fs } from "fs";
+import path from "path";
+import { logger } from "../utils/logger.js";
 
 /**
  * サーバー設定
@@ -33,11 +33,11 @@ class GuildSettingsManager {
 
   constructor() {
     this.settings = {
-      version: '1.0',
+      version: "1.0",
       guilds: {},
     };
     // データディレクトリに保存
-    this.settingsPath = path.join(process.cwd(), 'data', 'guild-settings.json');
+    this.settingsPath = path.join(process.cwd(), "data", "guild-settings.json");
   }
 
   /**
@@ -53,18 +53,20 @@ class GuildSettingsManager {
 
       // ファイルが存在する場合は読み込み
       try {
-        const data = await fs.readFile(this.settingsPath, 'utf-8');
+        const data = await fs.readFile(this.settingsPath, "utf-8");
         this.settings = JSON.parse(data) as GuildSettingsData;
-        logger.info(`Guild settings loaded: ${Object.keys(this.settings.guilds).length} guilds`);
+        logger.info(
+          `Guild settings loaded: ${Object.keys(this.settings.guilds).length} guilds`,
+        );
       } catch {
         // ファイルが存在しない場合は新規作成
-        logger.info('Guild settings file not found, creating new one');
+        logger.info("Guild settings file not found, creating new one");
         await this.save();
       }
 
       this.initialized = true;
     } catch (error) {
-      logger.error('Failed to initialize guild settings:', error);
+      logger.error("Failed to initialize guild settings:", error);
       throw error;
     }
   }
@@ -88,10 +90,14 @@ class GuildSettingsManager {
     try {
       const dataDir = path.dirname(this.settingsPath);
       await fs.mkdir(dataDir, { recursive: true });
-      await fs.writeFile(this.settingsPath, JSON.stringify(this.settings, null, 2), 'utf-8');
-      logger.debug('Guild settings saved');
+      await fs.writeFile(
+        this.settingsPath,
+        JSON.stringify(this.settings, null, 2),
+        "utf-8",
+      );
+      logger.debug("Guild settings saved");
     } catch (error) {
-      logger.error('Failed to save guild settings:', error);
+      logger.error("Failed to save guild settings:", error);
     }
   }
 
@@ -105,7 +111,9 @@ class GuildSettingsManager {
   /**
    * デフォルト出力チャンネルを取得
    */
-  getDefaultOutputChannel(guildId: string): { channelId: string; channelName?: string } | undefined {
+  getDefaultOutputChannel(
+    guildId: string,
+  ): { channelId: string; channelName?: string } | undefined {
     const settings = this.settings.guilds[guildId];
     if (settings?.defaultOutputChannelId) {
       return {
@@ -123,7 +131,7 @@ class GuildSettingsManager {
     guildId: string,
     channelId: string,
     channelName?: string,
-    guildName?: string
+    guildName?: string,
   ): void {
     if (!this.settings.guilds[guildId]) {
       this.settings.guilds[guildId] = {
@@ -139,7 +147,9 @@ class GuildSettingsManager {
     }
     this.settings.guilds[guildId].updatedAt = new Date().toISOString();
 
-    logger.info(`Default output channel set for guild ${guildId}: ${channelName ?? channelId}`);
+    logger.info(
+      `Default output channel set for guild ${guildId}: ${channelName ?? channelId}`,
+    );
     this.scheduleSave();
   }
 
@@ -186,4 +196,3 @@ class GuildSettingsManager {
 
 // シングルトンインスタンス
 export const guildSettings = new GuildSettingsManager();
-

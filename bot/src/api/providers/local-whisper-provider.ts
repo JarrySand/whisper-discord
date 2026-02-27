@@ -3,19 +3,19 @@
  *
  * 自前でホストした faster-whisper API を使用（ローカルまたは外部サーバー）
  */
-import axios, { AxiosInstance, isAxiosError } from 'axios';
-import FormData from 'form-data';
-import { logger } from '../../utils/logger.js';
+import axios, { AxiosInstance, isAxiosError } from "axios";
+import FormData from "form-data";
+import { logger } from "../../utils/logger.js";
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
   TranscriptionResponse,
   ProviderHealth,
   SelfHostedWhisperConfig,
-} from '../transcription-provider.js';
+} from "../transcription-provider.js";
 
-const DEFAULT_CONFIG: Omit<SelfHostedWhisperConfig, 'type'> = {
-  baseUrl: 'http://localhost:8000',
+const DEFAULT_CONFIG: Omit<SelfHostedWhisperConfig, "type"> = {
+  baseUrl: "http://localhost:8000",
   timeout: 60000,
   retryCount: 3,
   retryDelay: 1000,
@@ -25,7 +25,7 @@ const DEFAULT_CONFIG: Omit<SelfHostedWhisperConfig, 'type'> = {
 export { SelfHostedWhisperProvider as LocalWhisperProvider };
 
 export class SelfHostedWhisperProvider implements TranscriptionProvider {
-  readonly name = 'self-hosted-whisper';
+  readonly name = "self-hosted-whisper";
 
   private client: AxiosInstance;
   private config: SelfHostedWhisperConfig;
@@ -34,7 +34,7 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
 
   constructor(config: Partial<SelfHostedWhisperConfig>) {
     this.config = {
-      type: 'self-hosted',
+      type: "self-hosted",
       baseUrl: config.baseUrl ?? DEFAULT_CONFIG.baseUrl,
       timeout: config.timeout ?? DEFAULT_CONFIG.timeout,
       retryCount: config.retryCount ?? DEFAULT_CONFIG.retryCount,
@@ -46,40 +46,44 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
       timeout: this.config.timeout,
     });
 
-    logger.info(`SelfHostedWhisperProvider initialized: ${this.config.baseUrl}`);
+    logger.info(
+      `SelfHostedWhisperProvider initialized: ${this.config.baseUrl}`,
+    );
   }
 
-  async transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+  async transcribe(
+    request: TranscriptionRequest,
+  ): Promise<TranscriptionResponse> {
     const startTime = Date.now();
 
     try {
       const formData = new FormData();
 
       // 音声ファイル
-      formData.append('audio_file', request.audioData, {
+      formData.append("audio_file", request.audioData, {
         filename: `segment.${request.audioFormat}`,
         contentType: this.getContentType(request.audioFormat),
       });
 
       // メタデータ
-      formData.append('user_id', request.userId ?? 'unknown');
-      formData.append('username', request.username ?? 'unknown');
+      formData.append("user_id", request.userId ?? "unknown");
+      formData.append("username", request.username ?? "unknown");
       if (request.displayName) {
-        formData.append('display_name', request.displayName);
+        formData.append("display_name", request.displayName);
       }
-      formData.append('start_ts', (request.startTs ?? Date.now()).toString());
-      formData.append('end_ts', (request.endTs ?? Date.now()).toString());
-      formData.append('language', request.language ?? 'ja');
+      formData.append("start_ts", (request.startTs ?? Date.now()).toString());
+      formData.append("end_ts", (request.endTs ?? Date.now()).toString());
+      formData.append("language", request.language ?? "ja");
       // フィルターはBot側で行うので無効化
-      formData.append('filter_aizuchi', 'false');
+      formData.append("filter_aizuchi", "false");
 
       // プロンプト（文脈や専門用語を指定）
       if (request.prompt) {
-        formData.append('prompt', request.prompt);
+        formData.append("prompt", request.prompt);
       }
 
       const response = await this.executeWithRetry(async () => {
-        return await this.client.post('/transcribe', formData, {
+        return await this.client.post("/transcribe", formData, {
           headers: formData.getHeaders(),
         });
       });
@@ -100,21 +104,23 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
       return {
         success: false,
         error: {
-          code: data.error?.code ?? 'UNKNOWN_ERROR',
-          message: data.error?.message ?? 'Unknown error',
+          code: data.error?.code ?? "UNKNOWN_ERROR",
+          message: data.error?.message ?? "Unknown error",
         },
         processingTimeMs,
       };
     } catch (error) {
       const processingTimeMs = Date.now() - startTime;
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : "Unknown error";
 
-      logger.error('SelfHostedWhisperProvider transcription failed:', { error: message });
+      logger.error("SelfHostedWhisperProvider transcription failed:", {
+        error: message,
+      });
 
       return {
         success: false,
         error: {
-          code: 'TRANSCRIPTION_FAILED',
+          code: "TRANSCRIPTION_FAILED",
           message,
         },
         processingTimeMs,
@@ -124,8 +130,8 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
 
   async healthCheck(): Promise<ProviderHealth> {
     try {
-      const response = await this.client.get('/health', { timeout: 5000 });
-      this._isHealthy = response.data.status === 'healthy';
+      const response = await this.client.get("/health", { timeout: 5000 });
+      this._isHealthy = response.data.status === "healthy";
       this._lastHealthCheck = Date.now();
 
       return {
@@ -147,7 +153,7 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
         isHealthy: false,
         providerName: this.name,
         details: {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
           lastCheck: this._lastHealthCheck,
         },
       };
@@ -160,20 +166,18 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
 
   private getContentType(format: string): string {
     switch (format) {
-      case 'ogg':
-        return 'audio/ogg';
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'webm':
-        return 'audio/webm';
+      case "ogg":
+        return "audio/ogg";
+      case "mp3":
+        return "audio/mpeg";
+      case "webm":
+        return "audio/webm";
       default:
-        return 'audio/wav';
+        return "audio/wav";
     }
   }
 
-  private async executeWithRetry<T>(
-    operation: () => Promise<T>
-  ): Promise<T> {
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null;
     let delay = this.config.retryDelay ?? 1000;
 
@@ -191,7 +195,9 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
           break;
         }
 
-        logger.warn(`Retry attempt ${attempt + 1}`, { error: lastError.message });
+        logger.warn(`Retry attempt ${attempt + 1}`, {
+          error: lastError.message,
+        });
         await this.sleep(delay);
         delay *= 2;
       }
@@ -214,4 +220,3 @@ export class SelfHostedWhisperProvider implements TranscriptionProvider {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-

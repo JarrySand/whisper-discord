@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 
 /**
  * スラッシュコマンド定義
@@ -50,7 +50,7 @@ export interface AudioSegment {
   endTimestamp: number;
   duration: number;
   audioData: Buffer;
-  audioFormat: 'ogg' | 'wav';
+  audioFormat: "ogg" | "wav";
   audioPath?: string;
   sampleRate: number;
   channels: number;
@@ -73,7 +73,7 @@ export interface SilenceDetectionConfig {
 export interface SegmenterConfig {
   minDuration: number;
   maxDuration: number;
-  minRmsThreshold: number;  // 最小RMS閾値（これ以下は無音として破棄）
+  minRmsThreshold: number; // 最小RMS閾値（これ以下は無音として破棄）
   saveToFile: boolean;
   segmentDir: string;
 }
@@ -90,7 +90,7 @@ export interface BotConfig {
     silenceThreshold: number;
     maxSegmentDuration: number;
     minSegmentDuration: number;
-    minRmsThreshold: number;  // 最小RMS閾値（コスト削減用）
+    minRmsThreshold: number; // 最小RMS閾値（コスト削減用）
   };
   whisper: {
     apiUrl: string;
@@ -109,7 +109,7 @@ export interface BotConfig {
     sqliteDbDir: string;
     sqliteCleanupDays: number;
     discord: {
-      format: 'standard' | 'compact' | 'embed';
+      format: "standard" | "compact" | "embed";
       showTimestamp: boolean;
       showConfidence: boolean;
       batchMessages: boolean;
@@ -124,22 +124,22 @@ export interface BotConfig {
  */
 export enum BotErrorCode {
   // 接続系
-  NOT_IN_VOICE_CHANNEL = 'E001',
-  ALREADY_CONNECTED = 'E002',
-  CONNECTION_FAILED = 'E003',
-  CONNECTION_LOST = 'E004',
+  NOT_IN_VOICE_CHANNEL = "E001",
+  ALREADY_CONNECTED = "E002",
+  CONNECTION_FAILED = "E003",
+  CONNECTION_LOST = "E004",
 
   // 権限系
-  MISSING_PERMISSIONS = 'E101',
-  BOT_NOT_INVITED = 'E102',
+  MISSING_PERMISSIONS = "E101",
+  BOT_NOT_INVITED = "E102",
 
   // 音声処理系
-  AUDIO_BUFFER_OVERFLOW = 'E201',
-  ENCODING_FAILED = 'E202',
+  AUDIO_BUFFER_OVERFLOW = "E201",
+  ENCODING_FAILED = "E202",
 
   // API系
-  WHISPER_API_UNAVAILABLE = 'E301',
-  WHISPER_API_TIMEOUT = 'E302',
+  WHISPER_API_UNAVAILABLE = "E301",
+  WHISPER_API_TIMEOUT = "E302",
 }
 
 /**
@@ -173,7 +173,7 @@ export interface WhisperClientConfig {
  */
 export interface TranscribeRequest {
   audioData: Buffer;
-  audioFormat: 'ogg' | 'wav';
+  audioFormat: "ogg" | "wav";
   userId: string;
   username: string;
   displayName?: string;
@@ -314,7 +314,10 @@ export interface SessionContext {
   channelId: string;
   outputChannelId?: string;
   startedAt: Date;
-  participants: Map<string, { userId: string; username: string; displayName: string }>;
+  participants: Map<
+    string,
+    { userId: string; username: string; displayName: string }
+  >;
 }
 
 /**
@@ -363,7 +366,7 @@ export interface TranscriptionServiceStatus {
 /**
  * Discord出力フォーマット
  */
-export type DiscordOutputFormat = 'standard' | 'compact' | 'embed';
+export type DiscordOutputFormat = "standard" | "compact" | "embed";
 
 /**
  * Discord出力設定
@@ -520,4 +523,3 @@ export interface SessionStatsJson {
   words_per_minute: number;
   participant_count: number;
 }
-

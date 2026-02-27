@@ -63,4 +63,3 @@ export class Resampler {
     return this.ratio;
   }
 }
-

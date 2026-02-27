@@ -4,16 +4,19 @@
  * - セッション情報、会話ログ、統計情報を含む
  * - ドキュメント共有に適したフォーマット
  */
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { logger } from '../utils/logger.js';
-import type { TranscriptionResult, MarkdownWriterConfig } from '../types/index.js';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { logger } from "../utils/logger.js";
+import type {
+  TranscriptionResult,
+  MarkdownWriterConfig,
+} from "../types/index.js";
 
 /**
  * デフォルト設定
  */
 const defaultConfig: MarkdownWriterConfig = {
-  baseDir: './logs',
+  baseDir: "./logs",
   includeStats: true,
   includeTimestamps: true,
 };
@@ -40,16 +43,13 @@ export class MarkdownWriterService {
 
   constructor(config: Partial<MarkdownWriterConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
-    logger.debug('MarkdownWriterService initialized', { config: this.config });
+    logger.debug("MarkdownWriterService initialized", { config: this.config });
   }
 
   /**
    * セッションを開始
    */
-  async startSession(
-    channelName: string,
-    guildName: string
-  ): Promise<void> {
+  async startSession(channelName: string, guildName: string): Promise<void> {
     const now = new Date();
     const sessionId = this.generateSessionId(now);
 
@@ -65,10 +65,13 @@ export class MarkdownWriterService {
     const dateDir = this.getDateDir(now);
     await fs.mkdir(dateDir, { recursive: true });
 
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-');
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "-");
     this.mdPath = path.join(dateDir, `${sessionId}-${timeStr}.md`);
 
-    logger.info('MarkdownWriterService session started', { sessionId, mdPath: this.mdPath });
+    logger.info("MarkdownWriterService session started", {
+      sessionId,
+      mdPath: this.mdPath,
+    });
   }
 
   /**
@@ -92,13 +95,13 @@ export class MarkdownWriterService {
     const content = this.generateMarkdown(endTime);
 
     try {
-      await fs.writeFile(this.mdPath, content, 'utf-8');
-      logger.info('MarkdownWriterService session ended', {
+      await fs.writeFile(this.mdPath, content, "utf-8");
+      logger.info("MarkdownWriterService session ended", {
         sessionId: this.session.id,
         segments: this.segments.length,
       });
     } catch (error) {
-      logger.error('Failed to write markdown file', { error });
+      logger.error("Failed to write markdown file", { error });
     }
 
     this.session = null;
@@ -115,8 +118,10 @@ export class MarkdownWriterService {
     const dateStr = this.formatDate(startDate);
     const startTimeStr = this.formatTime(startDate);
     const endTimeStr = this.formatTime(endTime);
-    const duration = this.formatDuration(endTime.getTime() - startDate.getTime());
-    const participants = Array.from(session.participants).join(', ') || 'なし';
+    const duration = this.formatDuration(
+      endTime.getTime() - startDate.getTime(),
+    );
+    const participants = Array.from(session.participants).join(", ") || "なし";
 
     let md = `# 会議メモ - ${dateStr} ${startTimeStr}
 
@@ -195,10 +200,10 @@ export class MarkdownWriterService {
    * 日付をフォーマット
    */
   private formatDate(date: Date): string {
-    return date.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+    return date.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     });
   }
 
@@ -217,7 +222,7 @@ export class MarkdownWriterService {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
   /**
@@ -231,7 +236,7 @@ export class MarkdownWriterService {
    * 日付ディレクトリを取得
    */
   private getDateDir(date: Date): string {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = date.toISOString().split("T")[0];
     return path.join(this.config.baseDir, dateStr);
   }
 
@@ -244,4 +249,3 @@ export class MarkdownWriterService {
 }
 
 export default MarkdownWriterService;
-

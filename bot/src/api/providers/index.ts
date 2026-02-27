@@ -1,21 +1,24 @@
 /**
  * 文字起こしプロバイダー
  */
-export { SelfHostedWhisperProvider, LocalWhisperProvider } from './local-whisper-provider.js';
-export { OpenAIProvider } from './openai-provider.js';
-export { GroqProvider } from './groq-provider.js';
+export {
+  SelfHostedWhisperProvider,
+  LocalWhisperProvider,
+} from "./local-whisper-provider.js";
+export { OpenAIProvider } from "./openai-provider.js";
+export { GroqProvider } from "./groq-provider.js";
 
-export * from '../transcription-provider.js';
+export * from "../transcription-provider.js";
 
-import { logger } from '../../utils/logger.js';
+import { logger } from "../../utils/logger.js";
 import type {
   TranscriptionProvider,
   ProviderConfig,
-} from '../transcription-provider.js';
-import { SelfHostedWhisperProvider } from './local-whisper-provider.js';
-import { OpenAIProvider } from './openai-provider.js';
-import { GroqProvider } from './groq-provider.js';
-import { guildApiKeys } from '../../services/guild-api-keys.js';
+} from "../transcription-provider.js";
+import { SelfHostedWhisperProvider } from "./local-whisper-provider.js";
+import { OpenAIProvider } from "./openai-provider.js";
+import { GroqProvider } from "./groq-provider.js";
+import { guildApiKeys } from "../../services/guild-api-keys.js";
 
 /**
  * プロバイダーファクトリー
@@ -24,20 +27,22 @@ import { guildApiKeys } from '../../services/guild-api-keys.js';
  */
 export function createProvider(config: ProviderConfig): TranscriptionProvider {
   switch (config.type) {
-    case 'self-hosted':
-      logger.info('Creating SelfHostedWhisperProvider');
+    case "self-hosted":
+      logger.info("Creating SelfHostedWhisperProvider");
       return new SelfHostedWhisperProvider(config);
 
-    case 'openai':
-      logger.info('Creating OpenAIProvider');
+    case "openai":
+      logger.info("Creating OpenAIProvider");
       return new OpenAIProvider(config);
 
-    case 'groq':
-      logger.info('Creating GroqProvider');
+    case "groq":
+      logger.info("Creating GroqProvider");
       return new GroqProvider(config);
 
     default:
-      throw new Error(`Unknown provider type: ${(config as ProviderConfig).type}`);
+      throw new Error(
+        `Unknown provider type: ${(config as ProviderConfig).type}`,
+      );
   }
 }
 
@@ -55,31 +60,37 @@ export function createProviderForGuild(guildId: string): TranscriptionProvider {
   const guildConfig = guildApiKeys.getApiKeyConfig(guildId);
 
   if (!guildConfig) {
-    throw new Error(`API key not configured for guild ${guildId}. Use /apikey set command to configure.`);
+    throw new Error(
+      `API key not configured for guild ${guildId}. Use /apikey set command to configure.`,
+    );
   }
 
-  logger.info(`Using guild-specific provider for ${guildId}: ${guildConfig.provider}`);
+  logger.info(
+    `Using guild-specific provider for ${guildId}: ${guildConfig.provider}`,
+  );
 
   switch (guildConfig.provider) {
-    case 'groq': {
+    case "groq": {
       if (!guildConfig.apiKey) {
         throw new Error(`Groq API key not found for guild ${guildId}`);
       }
-      const model = (guildConfig.model as 'whisper-large-v3' | 'whisper-large-v3-turbo') ?? 'whisper-large-v3';
+      const model =
+        (guildConfig.model as "whisper-large-v3" | "whisper-large-v3-turbo") ??
+        "whisper-large-v3";
       return new GroqProvider({ apiKey: guildConfig.apiKey, model });
     }
 
-    case 'openai': {
+    case "openai": {
       if (!guildConfig.apiKey) {
         throw new Error(`OpenAI API key not found for guild ${guildId}`);
       }
       return new OpenAIProvider({ apiKey: guildConfig.apiKey });
     }
 
-    case 'self-hosted':
+    case "self-hosted":
     default:
       return new SelfHostedWhisperProvider({
-        baseUrl: guildConfig.selfHostedUrl ?? 'http://localhost:8000',
+        baseUrl: guildConfig.selfHostedUrl ?? "http://localhost:8000",
       });
   }
 }
