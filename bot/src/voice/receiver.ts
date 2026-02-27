@@ -2,14 +2,14 @@ import {
   VoiceConnection,
   VoiceReceiver,
   EndBehaviorType,
-} from '@discordjs/voice';
-import { Guild } from 'discord.js';
-import { EventEmitter } from 'events';
-import { Readable } from 'stream';
-import prism from 'prism-media';
-import { SSRCMapper } from './ssrc-mapper.js';
-import { AudioBufferManager } from '../audio/buffer.js';
-import { logger } from '../utils/logger.js';
+} from "@discordjs/voice";
+import { Guild } from "discord.js";
+import { EventEmitter } from "events";
+import { Readable } from "stream";
+import prism from "prism-media";
+import { SSRCMapper } from "./ssrc-mapper.js";
+import { AudioBufferManager } from "../audio/buffer.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * DAVE プロトコルエラーを検出
@@ -17,10 +17,10 @@ import { logger } from '../utils/logger.js';
 function isDAVEError(error: Error): boolean {
   const message = error.message.toLowerCase();
   return (
-    message.includes('corrupted') ||
-    message.includes('compressed data') ||
-    message.includes('encryption') ||
-    message.includes('decrypt')
+    message.includes("corrupted") ||
+    message.includes("compressed data") ||
+    message.includes("encryption") ||
+    message.includes("decrypt")
   );
 }
 
@@ -40,7 +40,7 @@ export class VoiceReceiverHandler extends EventEmitter {
 
   constructor(
     connection: VoiceConnection,
-    private guild: Guild
+    private guild: Guild,
   ) {
     super();
     this.receiver = connection.receiver;
@@ -54,12 +54,12 @@ export class VoiceReceiverHandler extends EventEmitter {
    */
   private setupEventHandlers(): void {
     // ユーザーが話し始めた時
-    this.receiver.speaking.on('start', (userId: string) => {
-      this.handleSpeakingStart(userId);
+    this.receiver.speaking.on("start", (userId: string) => {
+      void this.handleSpeakingStart(userId);
     });
 
     // ユーザーが話し終わった時
-    this.receiver.speaking.on('end', (userId: string) => {
+    this.receiver.speaking.on("end", (userId: string) => {
       this.handleSpeakingEnd(userId);
     });
   }
@@ -67,14 +67,16 @@ export class VoiceReceiverHandler extends EventEmitter {
   /**
    * 発話開始時の処理
    */
-  private handleSpeakingStart(userId: string): void {
+  private async handleSpeakingStart(userId: string): Promise<void> {
     // すでにストリームがある場合はスキップ
     if (this.activeStreams.has(userId)) {
       return;
     }
 
-    // GuildMember を取得
-    const member = this.guild.members.cache.get(userId);
+    // GuildMember を取得（キャッシュになければAPIから取得）
+    const member =
+      this.guild.members.cache.get(userId) ??
+      (await this.guild.members.fetch(userId).catch(() => null));
     if (!member) {
       logger.warn(`Could not find member for userId: ${userId}`);
       return;
@@ -98,7 +100,7 @@ export class VoiceReceiverHandler extends EventEmitter {
     // Opus → PCM デコード（パイプ後は再利用できないため毎回新規作成）
     // 既存のデコーダーがあればクリーンアップ
     this.cleanupDecoder(userId);
-    
+
     const decoder = new prism.opus.Decoder({
       rate: 48000,
       channels: 2,
@@ -112,18 +114,18 @@ export class VoiceReceiverHandler extends EventEmitter {
     // パイプラインでデコード
     const decodedStream = opusStream.pipe(decoder);
 
-    decodedStream.on('data', (pcmData: Buffer) => {
+    decodedStream.on("data", (pcmData: Buffer) => {
       if (userInfo) {
         this.bufferManager.appendAudio(
           userId,
           userInfo.username,
           userInfo.displayName,
-          pcmData
+          pcmData,
         );
       }
     });
 
-    decodedStream.on('error', (error: Error) => {
+    decodedStream.on("error", (error: Error) => {
       // DAVE プロトコルエラーの検出と処理
       if (isDAVEError(error)) {
         this.handleDAVEError(userId, error);
@@ -132,16 +134,21 @@ export class VoiceReceiverHandler extends EventEmitter {
       }
     });
 
-    opusStream.on('end', () => {
+    opusStream.on("end", () => {
       this.handleStreamEnd(userId);
       // デコーダーをクリーンアップ（再利用せず新規作成）
       this.cleanupDecoder(userId);
     });
 
-    opusStream.on('error', (error: Error) => {
+    opusStream.on("error", (error: Error) => {
       // DAVE/E2EE 関連エラーは警告レベルで処理（一部のユーザーで発生するが致命的ではない）
-      if (error.message.includes('decrypt') || error.message.includes('Decryption')) {
-        logger.warn(`DAVE encryption error for user ${userId} - audio may not be captured`);
+      if (
+        error.message.includes("decrypt") ||
+        error.message.includes("Decryption")
+      ) {
+        logger.warn(
+          `DAVE encryption error for user ${userId} - audio may not be captured`,
+        );
       } else {
         logger.error(`Opus stream error for user ${userId}:`, error);
       }
@@ -155,9 +162,7 @@ export class VoiceReceiverHandler extends EventEmitter {
    */
   private handleSpeakingEnd(userId: string): void {
     const userInfo = this.ssrcMapper.getByUserId(userId);
-    logger.debug(
-      `User ${userInfo?.displayName ?? userId} stopped speaking`
-    );
+    logger.debug(`User ${userInfo?.displayName ?? userId} stopped speaking`);
   }
 
   /**
@@ -205,31 +210,38 @@ export class VoiceReceiverHandler extends EventEmitter {
    */
   private handleDAVEError(userId: string, error: Error): void {
     const now = Date.now();
-    
+
     // 前回エラーから時間が経っていればカウントリセット
     if (now - this.lastDaveErrorTime > this.daveErrorResetTime) {
       this.daveErrorCount = 0;
     }
-    
+
     this.daveErrorCount++;
     this.lastDaveErrorTime = now;
-    
+
     // 初回のみ通知、その後はdebugレベル
     if (this.daveErrorCount === 1) {
-      logger.warn(`DAVE protocol error detected for user ${userId}`, error.message);
+      logger.warn(
+        `DAVE protocol error detected for user ${userId}`,
+        error.message,
+      );
     } else {
-      logger.debug(`DAVE protocol error (${this.daveErrorCount}/${this.daveErrorThreshold}) for user ${userId}`);
+      logger.debug(
+        `DAVE protocol error (${this.daveErrorCount}/${this.daveErrorThreshold}) for user ${userId}`,
+      );
     }
-    
+
     // 閾値を超えたら接続リセットを要求
     if (this.daveErrorCount >= this.daveErrorThreshold) {
-      logger.error('DAVE error threshold exceeded, requesting connection reset');
+      logger.error(
+        "DAVE error threshold exceeded, requesting connection reset",
+      );
       this.daveErrorCount = 0; // リセット後はカウントをリセット
-      
+
       // 接続リセットイベントを発火
-      this.emit('connectionResetRequired', {
+      this.emit("connectionResetRequired", {
         guildId: this.guild.id,
-        reason: 'DAVE protocol encryption error',
+        reason: "DAVE protocol encryption error",
         lastError: error.message,
       });
     }
@@ -241,7 +253,7 @@ export class VoiceReceiverHandler extends EventEmitter {
   resetDAVEErrorCount(): void {
     this.daveErrorCount = 0;
     this.lastDaveErrorTime = 0;
-    logger.debug('DAVE error count reset');
+    logger.debug("DAVE error count reset");
   }
 
   /**
@@ -254,7 +266,7 @@ export class VoiceReceiverHandler extends EventEmitter {
       logger.debug(`Destroyed stream for user ${userId}`);
     }
     this.activeStreams.clear();
-    
+
     // デコーダーを破棄（メモリリーク防止）
     for (const [userId, decoder] of this.activeDecoders) {
       try {
@@ -265,10 +277,9 @@ export class VoiceReceiverHandler extends EventEmitter {
       }
     }
     this.activeDecoders.clear();
-    
+
     this.ssrcMapper.clear();
     this.bufferManager.clear();
     this.daveErrorCount = 0;
   }
 }
-
