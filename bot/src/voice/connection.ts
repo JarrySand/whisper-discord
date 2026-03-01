@@ -213,35 +213,6 @@ class VoiceConnectionManager {
     const info = this.connections.get(guildId);
     if (info) {
       info.receiverHandler = handler;
-
-      // DAVE エラー時の接続リセットハンドリング
-      handler.on(
-        "connectionResetRequired",
-        async (data: {
-          guildId: string;
-          reason: string;
-          lastError: string;
-        }) => {
-          logger.warn("Connection reset required due to DAVE error", data);
-
-          // 出力チャンネルに通知
-          const connectionInfo = this.connections.get(data.guildId);
-          if (connectionInfo?.outputChannel) {
-            try {
-              await connectionInfo.outputChannel.send(
-                `⚠️ **音声デコードエラーが発生しました**\n` +
-                  `暗号化の不整合により音声が正常に受信できません。\n` +
-                  `\`/leave\` して30秒以上待ってから \`/join\` してください。`,
-              );
-            } catch (err) {
-              logger.error("Failed to send DAVE error notification", {
-                error: err,
-              });
-            }
-          }
-        },
-      );
-
       logger.info(`Set voice receiver handler for guild ${guildId}`);
     }
   }

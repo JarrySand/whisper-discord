@@ -33,10 +33,6 @@ export class VoiceReceiverHandler extends EventEmitter {
   private bufferManager: AudioBufferManager;
   private activeStreams = new Map<string, Readable>();
   private activeDecoders = new Map<string, prism.opus.Decoder>();
-  private daveErrorCount = 0;
-  private daveErrorThreshold = 3;
-  private daveErrorResetTime = 30000;
-  private lastDaveErrorTime = 0;
 
   // DAVE デコーダーエラーからの復旧追跡
   private daveDecoderErrors = new Map<string, number>();
@@ -166,25 +162,32 @@ export class VoiceReceiverHandler extends EventEmitter {
     });
 
     // デコーダーエラー時：デコーダーだけ差し替え、opusStreamは維持
+    // デコーダー復旧中は connectionResetRequired を発火しない（復旧自体がエラーハンドリング）
     decoder.on("error", (error: Error) => {
       if (isDAVEError(error)) {
         const errorCount = (this.daveDecoderErrors.get(userId) ?? 0) + 1;
         this.daveDecoderErrors.set(userId, errorCount);
-        this.handleDAVEError(userId, error);
 
         if (errorCount >= this.maxDecoderRecoveries) {
-          logger.error(
-            `Max DAVE decoder recoveries (${this.maxDecoderRecoveries}) reached for user ${userId}`,
+          logger.warn(
+            `Max DAVE decoder recoveries (${this.maxDecoderRecoveries}) reached for user ${userId}, will resubscribe`,
           );
           this.daveDecoderErrors.delete(userId);
           this.cleanupUserStream(userId);
+          this.scheduleResubscribe(userId);
           return;
         }
 
-        // デコーダーだけ作り直し、opusStreamは生かす
-        logger.info(
-          `Replacing decoder for user ${userId} (recovery ${errorCount}/${this.maxDecoderRecoveries})`,
-        );
+        // 初回のみ warn、以降は debug
+        if (errorCount === 1) {
+          logger.warn(
+            `DAVE decoder error for user ${userId}, replacing decoder`,
+          );
+        } else {
+          logger.debug(
+            `Replacing decoder for user ${userId} (${errorCount}/${this.maxDecoderRecoveries})`,
+          );
+        }
         this.setupDecoder(userId, opusStream);
       } else {
         logger.error(`Decoder error for user ${userId}:`, error);
@@ -293,54 +296,10 @@ export class VoiceReceiverHandler extends EventEmitter {
   }
 
   /**
-   * DAVE プロトコルエラーを処理
-   * 連続してエラーが発生した場合、接続リセットを要求
-   */
-  private handleDAVEError(userId: string, error: Error): void {
-    const now = Date.now();
-
-    // 前回エラーから時間が経っていればカウントリセット
-    if (now - this.lastDaveErrorTime > this.daveErrorResetTime) {
-      this.daveErrorCount = 0;
-    }
-
-    this.daveErrorCount++;
-    this.lastDaveErrorTime = now;
-
-    // 初回のみ通知、その後はdebugレベル
-    if (this.daveErrorCount === 1) {
-      logger.warn(
-        `DAVE protocol error detected for user ${userId}`,
-        error.message,
-      );
-    } else {
-      logger.debug(
-        `DAVE protocol error (${this.daveErrorCount}/${this.daveErrorThreshold}) for user ${userId}`,
-      );
-    }
-
-    // 閾値を超えたら接続リセットを要求
-    if (this.daveErrorCount >= this.daveErrorThreshold) {
-      logger.error(
-        "DAVE error threshold exceeded, requesting connection reset",
-      );
-      this.daveErrorCount = 0;
-
-      // 接続リセットイベントを発火
-      this.emit("connectionResetRequired", {
-        guildId: this.guild.id,
-        reason: "DAVE protocol encryption error",
-        lastError: error.message,
-      });
-    }
-  }
-
-  /**
    * DAVE エラーカウントをリセット
    */
   resetDAVEErrorCount(): void {
-    this.daveErrorCount = 0;
-    this.lastDaveErrorTime = 0;
+    this.daveDecoderErrors.clear();
     logger.debug("DAVE error count reset");
   }
 
@@ -376,6 +335,5 @@ export class VoiceReceiverHandler extends EventEmitter {
 
     this.ssrcMapper.clear();
     this.bufferManager.clear();
-    this.daveErrorCount = 0;
   }
 }
