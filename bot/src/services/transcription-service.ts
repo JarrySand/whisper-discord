@@ -315,13 +315,16 @@ export class TranscriptionService extends EventEmitter {
       return;
     }
 
+    // キューが空になるまで待機（処理中の文字起こしを完了させる）
+    await this.waitForQueueDrain(30000);
+
     // キュー停止
     this.queue.stop();
 
     // ヘルスモニタリング停止
     this.healthMonitor.stop();
 
-    // 出力マネージャーのセッション終了
+    // 出力マネージャーのセッション終了（全文字起こし完了後にmarkdownを生成）
     if (this.outputManager) {
       await this.outputManager.endSession();
     }
