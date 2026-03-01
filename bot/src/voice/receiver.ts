@@ -32,11 +32,19 @@ export class VoiceReceiverHandler extends EventEmitter {
   private ssrcMapper: SSRCMapper;
   private bufferManager: AudioBufferManager;
   private activeStreams = new Map<string, Readable>();
-  private activeDecoders = new Map<string, prism.opus.Decoder>(); // デコーダーを再利用
+  private activeDecoders = new Map<string, prism.opus.Decoder>();
   private daveErrorCount = 0;
-  private daveErrorThreshold = 3; // 連続3回でリセット要求
-  private daveErrorResetTime = 30000; // 30秒でカウントリセット
+  private daveErrorThreshold = 3;
+  private daveErrorResetTime = 30000;
   private lastDaveErrorTime = 0;
+
+  // DAVE デコーダーエラーからの復旧追跡
+  private daveDecoderErrors = new Map<string, number>();
+  private readonly maxDecoderRecoveries = 10;
+
+  // opusStream レベルのエラー後の再購読
+  private resubscribeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly resubscribeDelay = 1000; // 1秒後に再購読
 
   constructor(
     connection: VoiceConnection,
@@ -91,14 +99,41 @@ export class VoiceReceiverHandler extends EventEmitter {
     const opusStream = this.receiver.subscribe(userId, {
       end: {
         behavior: EndBehaviorType.AfterSilence,
-        duration: 1500, // 1.5秒の無音で終了（自然な会話ペースに対応）
+        duration: 1500,
       },
     });
 
     this.activeStreams.set(userId, opusStream);
 
-    // Opus → PCM デコード（パイプ後は再利用できないため毎回新規作成）
-    // 既存のデコーダーがあればクリーンアップ
+    // デコーダーを作成してデータリレーを開始
+    this.setupDecoder(userId, opusStream);
+
+    // opusStream 終了時
+    opusStream.on("end", () => {
+      this.handleStreamEnd(userId);
+      this.cleanupDecoder(userId);
+    });
+
+    // opusStream エラー時（購読レベルの問題）
+    opusStream.on("error", (error: Error) => {
+      if (isDAVEError(error)) {
+        logger.warn(
+          `DAVE stream error for user ${userId} - scheduling resubscribe`,
+        );
+        this.cleanupUserStream(userId);
+        this.scheduleResubscribe(userId);
+      } else {
+        logger.error(`Opus stream error for user ${userId}:`, error);
+        this.cleanupUserStream(userId);
+      }
+    });
+  }
+
+  /**
+   * デコーダーをセットアップし、opusStream からの手動リレーを構成
+   * pipe() を使わないことで、デコーダーエラー時にopusStreamを維持できる
+   */
+  private setupDecoder(userId: string, opusStream: Readable): void {
     this.cleanupDecoder(userId);
 
     const decoder = new prism.opus.Decoder({
@@ -108,14 +143,19 @@ export class VoiceReceiverHandler extends EventEmitter {
     });
     this.activeDecoders.set(userId, decoder);
 
-    // バッファに追加
     const userInfo = this.ssrcMapper.getByUserId(userId);
 
-    // パイプラインでデコード
-    const decodedStream = opusStream.pipe(decoder);
-
-    decodedStream.on("data", (pcmData: Buffer) => {
+    // デコーダーからPCMデータを受信
+    decoder.on("data", (pcmData: Buffer) => {
       if (userInfo) {
+        // DAVE エラーカウントをリセット（正常復旧を確認）
+        if (this.daveDecoderErrors.has(userId)) {
+          const errorCount = this.daveDecoderErrors.get(userId)!;
+          logger.info(
+            `DAVE decoder recovered for user ${userId} after ${errorCount} errors`,
+          );
+          this.daveDecoderErrors.delete(userId);
+        }
         this.bufferManager.appendAudio(
           userId,
           userInfo.username,
@@ -125,36 +165,43 @@ export class VoiceReceiverHandler extends EventEmitter {
       }
     });
 
-    decodedStream.on("error", (error: Error) => {
-      // DAVE プロトコルエラーの検出と処理
+    // デコーダーエラー時：デコーダーだけ差し替え、opusStreamは維持
+    decoder.on("error", (error: Error) => {
       if (isDAVEError(error)) {
+        const errorCount = (this.daveDecoderErrors.get(userId) ?? 0) + 1;
+        this.daveDecoderErrors.set(userId, errorCount);
         this.handleDAVEError(userId, error);
-      } else {
-        logger.error(`Error decoding audio for user ${userId}:`, error);
-      }
-    });
 
-    opusStream.on("end", () => {
-      this.handleStreamEnd(userId);
-      // デコーダーをクリーンアップ（再利用せず新規作成）
-      this.cleanupDecoder(userId);
-    });
+        if (errorCount >= this.maxDecoderRecoveries) {
+          logger.error(
+            `Max DAVE decoder recoveries (${this.maxDecoderRecoveries}) reached for user ${userId}`,
+          );
+          this.daveDecoderErrors.delete(userId);
+          this.cleanupUserStream(userId);
+          return;
+        }
 
-    opusStream.on("error", (error: Error) => {
-      // DAVE/E2EE 関連エラーは警告レベルで処理（一部のユーザーで発生するが致命的ではない）
-      if (
-        error.message.includes("decrypt") ||
-        error.message.includes("Decryption")
-      ) {
-        logger.warn(
-          `DAVE encryption error for user ${userId} - audio may not be captured`,
+        // デコーダーだけ作り直し、opusStreamは生かす
+        logger.info(
+          `Replacing decoder for user ${userId} (recovery ${errorCount}/${this.maxDecoderRecoveries})`,
         );
+        this.setupDecoder(userId, opusStream);
       } else {
-        logger.error(`Opus stream error for user ${userId}:`, error);
+        logger.error(`Decoder error for user ${userId}:`, error);
       }
-      this.activeStreams.delete(userId);
-      this.cleanupDecoder(userId);
     });
+
+    // opusStream → decoder への手動リレー（pipe不使用）
+    const onData = (opusPacket: Buffer) => {
+      const currentDecoder = this.activeDecoders.get(userId);
+      if (currentDecoder && !currentDecoder.destroyed) {
+        currentDecoder.write(opusPacket);
+      }
+    };
+
+    // 既存のdataリスナーを除去してから新しいものを登録
+    opusStream.removeAllListeners("data");
+    opusStream.on("data", onData);
   }
 
   /**
@@ -188,6 +235,47 @@ export class VoiceReceiverHandler extends EventEmitter {
       }
       this.activeDecoders.delete(userId);
     }
+  }
+
+  /**
+   * ユーザーのストリームとデコーダーをクリーンアップ
+   */
+  private cleanupUserStream(userId: string): void {
+    const stream = this.activeStreams.get(userId);
+    if (stream) {
+      try {
+        stream.removeAllListeners("data");
+        stream.destroy();
+      } catch {
+        // ignore
+      }
+      this.activeStreams.delete(userId);
+    }
+    this.cleanupDecoder(userId);
+  }
+
+  /**
+   * opusStream エラー後に再購読をスケジュール
+   */
+  private scheduleResubscribe(userId: string): void {
+    const existingTimer = this.resubscribeTimers.get(userId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    logger.info(
+      `Scheduling resubscribe for user ${userId} in ${this.resubscribeDelay}ms`,
+    );
+
+    const timer = setTimeout(() => {
+      this.resubscribeTimers.delete(userId);
+      if (!this.activeStreams.has(userId)) {
+        logger.info(`Retrying audio subscription for user ${userId}`);
+        void this.handleSpeakingStart(userId);
+      }
+    }, this.resubscribeDelay);
+
+    this.resubscribeTimers.set(userId, timer);
   }
 
   /**
@@ -236,7 +324,7 @@ export class VoiceReceiverHandler extends EventEmitter {
       logger.error(
         "DAVE error threshold exceeded, requesting connection reset",
       );
-      this.daveErrorCount = 0; // リセット後はカウントをリセット
+      this.daveErrorCount = 0;
 
       // 接続リセットイベントを発火
       this.emit("connectionResetRequired", {
@@ -260,8 +348,16 @@ export class VoiceReceiverHandler extends EventEmitter {
    * クリーンアップ
    */
   cleanup(): void {
+    // リトライタイマーをクリア
+    for (const timer of this.resubscribeTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.resubscribeTimers.clear();
+    this.daveDecoderErrors.clear();
+
     // ストリームを破棄
     for (const [userId, stream] of this.activeStreams) {
+      stream.removeAllListeners("data");
       stream.destroy();
       logger.debug(`Destroyed stream for user ${userId}`);
     }
