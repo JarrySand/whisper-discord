@@ -4,15 +4,18 @@
  * - 複数のフォーマット（standard/compact/embed）をサポート
  * - バッチ処理とレート制限対策
  */
-import { TextChannel, EmbedBuilder } from 'discord.js';
-import { logger } from '../utils/logger.js';
-import type { TranscriptionResult, DiscordOutputConfig } from '../types/index.js';
+import { TextChannel, EmbedBuilder } from "discord.js";
+import { logger } from "../utils/logger.js";
+import type {
+  TranscriptionResult,
+  DiscordOutputConfig,
+} from "../types/index.js";
 
 /**
  * デフォルト設定
  */
 const defaultConfig: DiscordOutputConfig = {
-  format: 'standard',
+  format: "standard",
   showTimestamp: true,
   showConfidence: false,
   batchMessages: true,
@@ -51,7 +54,7 @@ export class DiscordOutputService {
   constructor(config: Partial<DiscordOutputConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
     this.rateLimitHandler = new RateLimitHandler();
-    logger.debug('DiscordOutputService initialized', { config: this.config });
+    logger.debug("DiscordOutputService initialized", { config: this.config });
   }
 
   /**
@@ -59,7 +62,10 @@ export class DiscordOutputService {
    */
   setChannel(channel: TextChannel): void {
     this.channel = channel;
-    logger.debug('Discord output channel set', { channelId: channel.id, channelName: channel.name });
+    logger.debug("Discord output channel set", {
+      channelId: channel.id,
+      channelName: channel.name,
+    });
   }
 
   /**
@@ -74,7 +80,7 @@ export class DiscordOutputService {
    */
   async post(result: TranscriptionResult): Promise<void> {
     if (!this.channel) {
-      logger.warn('Output channel not set, skipping Discord post');
+      logger.warn("Output channel not set, skipping Discord post");
       return;
     }
 
@@ -94,14 +100,14 @@ export class DiscordOutputService {
     try {
       await this.rateLimitHandler.waitIfNeeded();
 
-      if (this.config.format === 'embed') {
+      if (this.config.format === "embed") {
         await this.postEmbed(result);
       } else {
         const content = this.formatMessage(result);
         await this.channel.send(content);
       }
     } catch (error) {
-      logger.error('Failed to send Discord message', { error });
+      logger.error("Failed to send Discord message", { error });
     }
   }
 
@@ -114,7 +120,7 @@ export class DiscordOutputService {
     if (!this.batchTimer) {
       this.batchTimer = setTimeout(
         () => this.flushQueue(),
-        this.config.batchIntervalMs
+        this.config.batchIntervalMs,
       );
     }
   }
@@ -134,7 +140,7 @@ export class DiscordOutputService {
       await this.rateLimitHandler.waitIfNeeded();
 
       // Embed形式の場合は個別送信
-      if (this.config.format === 'embed') {
+      if (this.config.format === "embed") {
         for (const msg of messages) {
           await this.postEmbed(msg);
         }
@@ -142,9 +148,7 @@ export class DiscordOutputService {
       }
 
       // 複数メッセージを結合
-      const content = messages
-        .map((r) => this.formatMessage(r))
-        .join('\n\n');
+      const content = messages.map((r) => this.formatMessage(r)).join("\n\n");
 
       // Discord の文字数制限 (2000文字) を考慮
       if (content.length <= 2000) {
@@ -154,7 +158,7 @@ export class DiscordOutputService {
         await this.sendChunked(messages);
       }
     } catch (error) {
-      logger.error('Failed to flush Discord message queue', { error });
+      logger.error("Failed to flush Discord message queue", { error });
     }
   }
 
@@ -164,10 +168,10 @@ export class DiscordOutputService {
   private async sendChunked(messages: TranscriptionResult[]): Promise<void> {
     if (!this.channel) return;
 
-    let chunk = '';
+    let chunk = "";
     for (const msg of messages) {
       const formatted = this.formatMessage(msg);
-      
+
       if (chunk.length + formatted.length + 2 > 2000) {
         // 現在のチャンクを送信
         if (chunk) {
@@ -192,9 +196,9 @@ export class DiscordOutputService {
    */
   private formatMessage(result: TranscriptionResult): string {
     switch (this.config.format) {
-      case 'compact':
+      case "compact":
         return this.formatCompact(result);
-      case 'standard':
+      case "standard":
       default:
         return this.formatStandard(result);
     }
@@ -202,16 +206,16 @@ export class DiscordOutputService {
 
   /**
    * 標準フォーマット
-   * 🎤 **Alice** <t:1733389200:T>
+   * **Alice** <t:1733389200:T>
    * こんにちは
    */
   private formatStandard(result: TranscriptionResult): string {
     const displayName = result.displayName ?? result.username;
     const timestamp = this.config.showTimestamp
       ? ` <t:${Math.floor(result.startTs / 1000)}:T>`
-      : '';
+      : "";
 
-    let text = `🎤 **${displayName}**${timestamp}\n${result.text}`;
+    let text = `**${displayName}**${timestamp}\n${result.text}`;
 
     if (this.config.showConfidence) {
       const confidencePercent = Math.round(result.confidence * 100);
@@ -245,7 +249,7 @@ export class DiscordOutputService {
       })
       .setDescription(result.text)
       .setTimestamp(result.startTs)
-      .setColor(0x5865F2);
+      .setColor(0x5865f2);
 
     if (this.config.showConfidence) {
       embed.setFooter({
@@ -273,9 +277,8 @@ export class DiscordOutputService {
   async stop(): Promise<void> {
     await this.flush();
     this.channel = null;
-    logger.debug('DiscordOutputService stopped');
+    logger.debug("DiscordOutputService stopped");
   }
 }
 
 export default DiscordOutputService;
-

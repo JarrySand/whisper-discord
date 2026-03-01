@@ -5,17 +5,17 @@
  * - エラーハンドリング（1つの出力失敗で他は継続）
  * - セッション終了時にMarkdownをDiscordチャンネルに自動共有
  */
-import { TextChannel, AttachmentBuilder } from 'discord.js';
-import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs/promises';
-import { logger } from '../utils/logger.js';
-import { DiscordOutputService } from './discord.js';
-import { FileLoggerService } from './file-logger.js';
-import { JsonStoreService } from './json-store.js';
-import { MarkdownWriterService } from './markdown-writer.js';
+import { TextChannel, AttachmentBuilder } from "discord.js";
+import { v4 as uuidv4 } from "uuid";
+import * as fs from "fs/promises";
+import { logger } from "../utils/logger.js";
+import { DiscordOutputService } from "./discord.js";
+import { FileLoggerService } from "./file-logger.js";
+import { JsonStoreService } from "./json-store.js";
+import { MarkdownWriterService } from "./markdown-writer.js";
 // SQLite は条件付きで動的インポート（メモリ節約）
-type SqliteStore = import('./sqlite-store.js').SqliteStore;
-type SqliteStoreManager = import('./sqlite-store.js').SqliteStoreManager;
+type SqliteStore = import("./sqlite-store.js").SqliteStore;
+type SqliteStoreManager = import("./sqlite-store.js").SqliteStoreManager;
 import type {
   TranscriptionResult,
   OutputManagerConfig,
@@ -24,7 +24,7 @@ import type {
   JsonStoreConfig,
   MarkdownWriterConfig,
   SqliteStoreConfig,
-} from '../types/index.js';
+} from "../types/index.js";
 
 /**
  * デフォルト設定
@@ -49,7 +49,7 @@ const defaultConfig: OutputManagerConfig = {
   sqlite: {
     enabled: false,
     config: {
-      dbDir: './data',
+      dbDir: "./data",
       cleanupDays: 30,
     },
   },
@@ -76,7 +76,7 @@ export class OutputManager {
   private jsonStore: JsonStoreService | null = null;
   private markdownWriter: MarkdownWriterService | null = null;
   private sqliteStoreManager: SqliteStoreManager | null = null;
-  private sqliteStore: SqliteStore | null = null;  // Current session's store (obtained from manager)
+  private sqliteStore: SqliteStore | null = null; // Current session's store (obtained from manager)
   private isSessionActive: boolean = false;
   private currentSessionId: string | null = null;
   private participantCount: number = 0;
@@ -94,25 +94,25 @@ export class OutputManager {
     // 有効なサービスを初期化
     if (this.config.discord.enabled) {
       this.discord = new DiscordOutputService(
-        this.config.discord.config as DiscordOutputConfig
+        this.config.discord.config as DiscordOutputConfig,
       );
     }
 
     if (this.config.fileLog.enabled) {
       this.fileLogger = new FileLoggerService(
-        this.config.fileLog.config as FileLoggerConfig
+        this.config.fileLog.config as FileLoggerConfig,
       );
     }
 
     if (this.config.jsonStore.enabled) {
       this.jsonStore = new JsonStoreService(
-        this.config.jsonStore.config as JsonStoreConfig
+        this.config.jsonStore.config as JsonStoreConfig,
       );
     }
 
     if (this.config.markdown.enabled) {
       this.markdownWriter = new MarkdownWriterService(
-        this.config.markdown.config as MarkdownWriterConfig
+        this.config.markdown.config as MarkdownWriterConfig,
       );
     }
 
@@ -120,7 +120,7 @@ export class OutputManager {
     // 通常はbot.tsのSqliteStoreManagerを共有する
     // this.initSqlite() は setSqliteStoreManager() で設定されない場合のフォールバック
 
-    logger.info('OutputManager initialized', {
+    logger.info("OutputManager initialized", {
       discord: this.config.discord.enabled,
       fileLog: this.config.fileLog.enabled,
       jsonStore: this.config.jsonStore.enabled,
@@ -134,7 +134,7 @@ export class OutputManager {
    */
   setSqliteStoreManager(manager: SqliteStoreManager): void {
     this.sqliteStoreManager = manager;
-    logger.info('OutputManager: SqliteStoreManager set from external source');
+    logger.info("OutputManager: SqliteStoreManager set from external source");
   }
 
   /**
@@ -142,7 +142,7 @@ export class OutputManager {
    */
   async startSession(context: OutputSessionContext): Promise<void> {
     if (this.isSessionActive) {
-      logger.warn('OutputManager session already active');
+      logger.warn("OutputManager session already active");
       return;
     }
 
@@ -166,8 +166,10 @@ export class OutputManager {
         this.fileLogger
           .startSession(context.channelName, context.guildName)
           .catch((err) => {
-            logger.error('FileLoggerService failed to start session', { error: err });
-          })
+            logger.error("FileLoggerService failed to start session", {
+              error: err,
+            });
+          }),
       );
     }
 
@@ -179,11 +181,13 @@ export class OutputManager {
             context.guildId,
             context.guildName,
             context.channelId,
-            context.channelName
+            context.channelName,
           )
           .catch((err) => {
-            logger.error('JsonStoreService failed to start session', { error: err });
-          })
+            logger.error("JsonStoreService failed to start session", {
+              error: err,
+            });
+          }),
       );
     }
 
@@ -193,8 +197,10 @@ export class OutputManager {
         this.markdownWriter
           .startSession(context.channelName, context.guildName)
           .catch((err) => {
-            logger.error('MarkdownWriterService failed to start session', { error: err });
-          })
+            logger.error("MarkdownWriterService failed to start session", {
+              error: err,
+            });
+          }),
       );
     }
 
@@ -212,14 +218,14 @@ export class OutputManager {
           startedAt: new Date(),
         });
       } catch (err) {
-        logger.error('SqliteStore failed to start session', { error: err });
+        logger.error("SqliteStore failed to start session", { error: err });
       }
     }
 
     await Promise.all(promises);
     this.isSessionActive = true;
 
-    logger.info('OutputManager session started', {
+    logger.info("OutputManager session started", {
       guildName: context.guildName,
       channelName: context.channelName,
       sessionId: this.currentSessionId,
@@ -230,14 +236,14 @@ export class OutputManager {
    * 文字起こし結果を出力
    */
   async output(result: TranscriptionResult): Promise<void> {
-    logger.debug('OutputManager.output called', {
+    logger.debug("OutputManager.output called", {
       isSessionActive: this.isSessionActive,
       hasDiscord: !!this.discord,
       text: result.text.substring(0, 50),
     });
 
     if (!this.isSessionActive) {
-      logger.warn('OutputManager session not active');
+      logger.warn("OutputManager session not active");
       return;
     }
 
@@ -245,22 +251,22 @@ export class OutputManager {
 
     // Discord出力
     if (this.discord) {
-      logger.info('Posting to Discord', { text: result.text.substring(0, 30) });
+      logger.info("Posting to Discord", { text: result.text.substring(0, 30) });
       promises.push(
         this.discord.post(result).catch((err) => {
-          logger.error('Discord output failed', { error: err });
-        })
+          logger.error("Discord output failed", { error: err });
+        }),
       );
     } else {
-      logger.warn('Discord service not available');
+      logger.warn("Discord service not available");
     }
 
     // ファイルログ出力
     if (this.fileLogger) {
       promises.push(
         this.fileLogger.log(result).catch((err) => {
-          logger.error('File log output failed', { error: err });
-        })
+          logger.error("File log output failed", { error: err });
+        }),
       );
     }
 
@@ -268,8 +274,8 @@ export class OutputManager {
     if (this.jsonStore) {
       promises.push(
         this.jsonStore.addSegment(result).catch((err) => {
-          logger.error('JSON store output failed', { error: err });
-        })
+          logger.error("JSON store output failed", { error: err });
+        }),
       );
     }
 
@@ -283,7 +289,7 @@ export class OutputManager {
       try {
         this.sqliteStore.saveTranscriptionResult(result);
       } catch (err) {
-        logger.error('SQLite store output failed', { error: err });
+        logger.error("SQLite store output failed", { error: err });
       }
     }
 
@@ -311,8 +317,8 @@ export class OutputManager {
     if (this.discord) {
       promises.push(
         this.discord.flush().catch((err) => {
-          logger.error('Discord output flush failed', { error: err });
-        })
+          logger.error("Discord output flush failed", { error: err });
+        }),
       );
     }
 
@@ -320,8 +326,10 @@ export class OutputManager {
     if (this.fileLogger) {
       promises.push(
         this.fileLogger.endSession().catch((err) => {
-          logger.error('FileLoggerService failed to end session', { error: err });
-        })
+          logger.error("FileLoggerService failed to end session", {
+            error: err,
+          });
+        }),
       );
     }
 
@@ -329,8 +337,10 @@ export class OutputManager {
     if (this.jsonStore) {
       promises.push(
         this.jsonStore.endSession().catch((err) => {
-          logger.error('JsonStoreService failed to end session', { error: err });
-        })
+          logger.error("JsonStoreService failed to end session", {
+            error: err,
+          });
+        }),
       );
     }
 
@@ -339,7 +349,9 @@ export class OutputManager {
     const mdPath = this.markdownWriter?.getMdPath();
     if (this.markdownWriter) {
       await this.markdownWriter.endSession().catch((err) => {
-        logger.error('MarkdownWriterService failed to end session', { error: err });
+        logger.error("MarkdownWriterService failed to end session", {
+          error: err,
+        });
       });
     }
 
@@ -348,7 +360,7 @@ export class OutputManager {
       try {
         this.sqliteStore.endSession(this.participantCount);
       } catch (err) {
-        logger.error('SqliteStore failed to end session', { error: err });
+        logger.error("SqliteStore failed to end session", { error: err });
       }
     }
 
@@ -363,9 +375,9 @@ export class OutputManager {
     this.currentSessionId = null;
     this.participantCount = 0;
     this.outputChannel = null;
-    this.sqliteStore = null;  // セッション終了時にストア参照をクリア
+    this.sqliteStore = null; // セッション終了時にストア参照をクリア
 
-    logger.info('OutputManager session ended');
+    logger.info("OutputManager session ended");
   }
 
   /**
@@ -373,7 +385,7 @@ export class OutputManager {
    */
   private async shareMarkdownToDiscord(mdPath: string): Promise<void> {
     if (!this.outputChannel) {
-      logger.debug('No output channel set, skipping Markdown share');
+      logger.debug("No output channel set, skipping Markdown share");
       return;
     }
 
@@ -382,22 +394,22 @@ export class OutputManager {
       await fs.access(mdPath);
 
       // ファイル名を取得
-      const fileName = mdPath.split(/[/\\]/).pop() ?? 'session.md';
+      const fileName = mdPath.split(/[/\\]/).pop() ?? "session.md";
 
       // ファイルを添付して送信
       const attachment = new AttachmentBuilder(mdPath, { name: fileName });
-      
+
       await this.outputChannel.send({
-        content: '📋 **セッション終了** - 会議メモを生成しました',
+        content: "**セッション終了** - 会議メモを生成しました",
         files: [attachment],
       });
 
-      logger.info('Markdown file shared to Discord channel', {
+      logger.info("Markdown file shared to Discord channel", {
         channelId: this.outputChannel.id,
         filePath: mdPath,
       });
     } catch (error) {
-      logger.error('Failed to share Markdown to Discord', { error, mdPath });
+      logger.error("Failed to share Markdown to Discord", { error, mdPath });
     }
   }
 
@@ -471,4 +483,3 @@ export class OutputManager {
 }
 
 export default OutputManager;
-
