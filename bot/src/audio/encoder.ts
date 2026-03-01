@@ -1,6 +1,6 @@
-import { spawn } from 'child_process';
-import { Readable } from 'stream';
-import { logger } from '../utils/logger.js';
+import { spawn } from "child_process";
+import { Readable } from "stream";
+import { logger } from "../utils/logger.js";
 
 /**
  * 音声エンコーダー
@@ -17,21 +17,21 @@ export class AudioEncoder {
     }
 
     return new Promise((resolve) => {
-      const ffmpeg = spawn('ffmpeg', ['-version']);
+      const ffmpeg = spawn("ffmpeg", ["-version"]);
 
-      ffmpeg.on('close', (code) => {
+      ffmpeg.on("close", (code) => {
         this.ffmpegAvailable = code === 0;
         if (this.ffmpegAvailable) {
-          logger.info('FFmpeg is available');
+          logger.info("FFmpeg is available");
         } else {
-          logger.warn('FFmpeg is not available, will use WAV fallback');
+          logger.warn("FFmpeg is not available, will use WAV fallback");
         }
         resolve(this.ffmpegAvailable);
       });
 
-      ffmpeg.on('error', () => {
+      ffmpeg.on("error", () => {
         this.ffmpegAvailable = false;
-        logger.warn('FFmpeg is not available, will use WAV fallback');
+        logger.warn("FFmpeg is not available, will use WAV fallback");
         resolve(false);
       });
     });
@@ -44,33 +44,42 @@ export class AudioEncoder {
     // FFmpeg が利用可能かチェック
     const isAvailable = await this.checkFFmpeg();
     if (!isAvailable) {
-      throw new Error('FFmpeg is not available');
+      throw new Error("FFmpeg is not available");
     }
 
     return new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', [
-        '-f', 's16le', // 入力: signed 16-bit little-endian
-        '-ar', '16000', // サンプルレート: 16kHz
-        '-ac', '1', // チャンネル: mono
-        '-i', 'pipe:0', // 入力: stdin
-        '-c:a', 'libopus', // コーデック: Opus
-        '-b:a', '32k', // ビットレート: 32kbps
-        '-vbr', 'on', // 可変ビットレート
-        '-compression_level', '10', // 最高圧縮
-        '-f', 'ogg', // 出力形式: OGG
-        'pipe:1', // 出力: stdout
+      const ffmpeg = spawn("ffmpeg", [
+        "-f",
+        "s16le", // 入力: signed 16-bit little-endian
+        "-ar",
+        "16000", // サンプルレート: 16kHz
+        "-ac",
+        "1", // チャンネル: mono
+        "-i",
+        "pipe:0", // 入力: stdin
+        "-c:a",
+        "libopus", // コーデック: Opus
+        "-b:a",
+        "32k", // ビットレート: 32kbps
+        "-vbr",
+        "on", // 可変ビットレート
+        "-compression_level",
+        "10", // 最高圧縮
+        "-f",
+        "ogg", // 出力形式: OGG
+        "pipe:1", // 出力: stdout
       ]);
 
       const chunks: Buffer[] = [];
 
-      ffmpeg.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      ffmpeg.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
 
-      ffmpeg.stderr.on('data', (data: Buffer) => {
+      ffmpeg.stderr.on("data", (data: Buffer) => {
         // FFmpegの進捗情報はstderrに出力されるため、通常は無視
         logger.debug(`FFmpeg stderr: ${data.toString()}`);
       });
 
-      ffmpeg.on('close', (code) => {
+      ffmpeg.on("close", (code) => {
         if (code === 0) {
           resolve(Buffer.concat(chunks));
         } else {
@@ -78,7 +87,7 @@ export class AudioEncoder {
         }
       });
 
-      ffmpeg.on('error', (error) => {
+      ffmpeg.on("error", (error) => {
         reject(error);
       });
 
@@ -104,12 +113,12 @@ export class AudioEncoder {
     const header = Buffer.alloc(44);
 
     // RIFF header
-    header.write('RIFF', 0);
+    header.write("RIFF", 0);
     header.writeUInt32LE(fileSize, 4);
-    header.write('WAVE', 8);
+    header.write("WAVE", 8);
 
     // fmt subchunk
-    header.write('fmt ', 12);
+    header.write("fmt ", 12);
     header.writeUInt32LE(16, 16); // Subchunk1Size
     header.writeUInt16LE(1, 20); // AudioFormat (PCM)
     header.writeUInt16LE(channels, 22);
@@ -119,7 +128,7 @@ export class AudioEncoder {
     header.writeUInt16LE(bitsPerSample, 34);
 
     // data subchunk
-    header.write('data', 36);
+    header.write("data", 36);
     header.writeUInt32LE(dataSize, 40);
 
     return Buffer.concat([header, pcmData]);
@@ -130,19 +139,18 @@ export class AudioEncoder {
    */
   async encode(
     pcmData: Buffer,
-    preferOgg = true
-  ): Promise<{ data: Buffer; format: 'ogg' | 'wav' }> {
+    preferOgg = true,
+  ): Promise<{ data: Buffer; format: "ogg" | "wav" }> {
     if (preferOgg) {
       try {
         const data = await this.encodeToOgg(pcmData);
-        return { data, format: 'ogg' };
+        return { data, format: "ogg" };
       } catch {
-        logger.warn('OGG encoding failed, falling back to WAV');
+        logger.warn("OGG encoding failed, falling back to WAV");
       }
     }
 
     const data = this.encodeToWav(pcmData);
-    return { data, format: 'wav' };
+    return { data, format: "wav" };
   }
 }
-

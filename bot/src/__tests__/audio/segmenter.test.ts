@@ -1,6 +1,6 @@
 /**
  * AudioSegmenter テスト
- * 
+ *
  * テスト項目:
  * - セグメント作成
  * - 最小長フィルタリング
@@ -8,8 +8,8 @@
  * - RMS計算
  * - 統計情報
  */
-import { AudioSegmenter } from '../../audio/segmenter.js';
-import type { UserAudioBuffer } from '../../types/index.js';
+import { AudioSegmenter } from "../../audio/segmenter.js";
+import type { UserAudioBuffer } from "../../types/index.js";
 
 /**
  * 無音PCMデータを生成（16-bit Stereo, 48kHz）
@@ -35,7 +35,9 @@ function createLoudPcm(durationMs: number, amplitude = 10000): Buffer {
 
   for (let i = 0; i < samples; i++) {
     const freq = 440;
-    const value = Math.floor(amplitude * Math.sin((2 * Math.PI * freq * i) / sampleRate));
+    const value = Math.floor(
+      amplitude * Math.sin((2 * Math.PI * freq * i) / sampleRate),
+    );
     // ステレオなので左右両方に書き込み
     buffer.writeInt16LE(value, i * bytesPerSample * channels);
     buffer.writeInt16LE(value, i * bytesPerSample * channels + bytesPerSample);
@@ -50,13 +52,13 @@ function createLoudPcm(durationMs: number, amplitude = 10000): Buffer {
 function createMockBuffer(
   durationMs: number,
   pcmData: Buffer,
-  overrides: Partial<UserAudioBuffer> = {}
+  overrides: Partial<UserAudioBuffer> = {},
 ): UserAudioBuffer {
   const now = Date.now();
   return {
-    userId: 'user-1',
-    username: 'testuser',
-    displayName: 'Test User',
+    userId: "user-1",
+    username: "testuser",
+    displayName: "Test User",
     startTimestamp: now - durationMs,
     lastActivityTimestamp: now,
     chunks: [{ data: pcmData, timestamp: now - durationMs }],
@@ -64,7 +66,7 @@ function createMockBuffer(
   };
 }
 
-describe('AudioSegmenter', () => {
+describe("AudioSegmenter", () => {
   let segmenter: AudioSegmenter;
 
   beforeEach(() => {
@@ -76,8 +78,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('初期化', () => {
-    test('デフォルト設定で初期化される', () => {
+  describe("初期化", () => {
+    test("デフォルト設定で初期化される", () => {
       const defaultSegmenter = new AudioSegmenter();
       const config = defaultSegmenter.getConfig();
 
@@ -87,7 +89,7 @@ describe('AudioSegmenter', () => {
       expect(config.saveToFile).toBe(false);
     });
 
-    test('カスタム設定で初期化される', () => {
+    test("カスタム設定で初期化される", () => {
       const config = segmenter.getConfig();
 
       expect(config.minDuration).toBe(500);
@@ -96,8 +98,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('セグメント作成', () => {
-    test('有効な音声からセグメントを作成できる', async () => {
+  describe("セグメント作成", () => {
+    test("有効な音声からセグメントを作成できる", async () => {
       const duration = 1000;
       const pcmData = createLoudPcm(duration);
       const buffer = createMockBuffer(duration, pcmData);
@@ -105,30 +107,30 @@ describe('AudioSegmenter', () => {
       const segment = await segmenter.createSegment(buffer);
 
       expect(segment).not.toBeNull();
-      expect(segment!.userId).toBe('user-1');
-      expect(segment!.username).toBe('testuser');
+      expect(segment!.userId).toBe("user-1");
+      expect(segment!.username).toBe("testuser");
       expect(segment!.duration).toBe(duration);
       expect(segment!.audioData).toBeInstanceOf(Buffer);
       expect(segment!.audioData.length).toBeGreaterThan(0);
     });
 
-    test('セグメントにユーザー情報が含まれる', async () => {
+    test("セグメントにユーザー情報が含まれる", async () => {
       const pcmData = createLoudPcm(1000);
       const buffer = createMockBuffer(1000, pcmData, {
-        userId: 'user-123',
-        username: 'alice',
-        displayName: 'Alice',
+        userId: "user-123",
+        username: "alice",
+        displayName: "Alice",
       });
 
       const segment = await segmenter.createSegment(buffer);
 
       expect(segment).not.toBeNull();
-      expect(segment!.userId).toBe('user-123');
-      expect(segment!.username).toBe('alice');
-      expect(segment!.displayName).toBe('Alice');
+      expect(segment!.userId).toBe("user-123");
+      expect(segment!.username).toBe("alice");
+      expect(segment!.displayName).toBe("Alice");
     });
 
-    test('セグメントにタイムスタンプが含まれる', async () => {
+    test("セグメントにタイムスタンプが含まれる", async () => {
       const now = Date.now();
       const pcmData = createLoudPcm(1000);
       const buffer = createMockBuffer(1000, pcmData, {
@@ -144,8 +146,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('最小長フィルタリング', () => {
-    test('最小長未満のセグメントは破棄される', async () => {
+  describe("最小長フィルタリング", () => {
+    test("最小長未満のセグメントは破棄される", async () => {
       const duration = 300; // 500ms未満
       const pcmData = createLoudPcm(duration);
       const buffer = createMockBuffer(duration, pcmData);
@@ -155,7 +157,7 @@ describe('AudioSegmenter', () => {
       expect(segment).toBeNull();
     });
 
-    test('最小長以上のセグメントは作成される', async () => {
+    test("最小長以上のセグメントは作成される", async () => {
       const duration = 600; // 500ms以上
       const pcmData = createLoudPcm(duration);
       const buffer = createMockBuffer(duration, pcmData);
@@ -165,7 +167,7 @@ describe('AudioSegmenter', () => {
       expect(segment).not.toBeNull();
     });
 
-    test('破棄されたセグメントが統計にカウントされる', async () => {
+    test("破棄されたセグメントが統計にカウントされる", async () => {
       segmenter.resetStats();
 
       const shortPcm = createLoudPcm(300);
@@ -177,8 +179,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('低エネルギーフィルタリング', () => {
-    test('無音セグメントは破棄される', async () => {
+  describe("低エネルギーフィルタリング", () => {
+    test("無音セグメントは破棄される", async () => {
       const duration = 1000;
       const pcmData = createSilentPcm(duration);
       const buffer = createMockBuffer(duration, pcmData);
@@ -188,7 +190,7 @@ describe('AudioSegmenter', () => {
       expect(segment).toBeNull();
     });
 
-    test('破棄されたセグメントが統計にカウントされる', async () => {
+    test("破棄されたセグメントが統計にカウントされる", async () => {
       segmenter.resetStats();
 
       const silentPcm = createSilentPcm(1000);
@@ -200,29 +202,29 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('音声フォーマット', () => {
-    test('セグメントにフォーマット情報が含まれる', async () => {
+  describe("音声フォーマット", () => {
+    test("セグメントにフォーマット情報が含まれる", async () => {
       const pcmData = createLoudPcm(1000);
       const buffer = createMockBuffer(1000, pcmData);
 
       const segment = await segmenter.createSegment(buffer);
 
       expect(segment).not.toBeNull();
-      expect(['ogg', 'wav']).toContain(segment!.audioFormat);
+      expect(["ogg", "wav"]).toContain(segment!.audioFormat);
       expect(segment!.sampleRate).toBe(16000);
       expect(segment!.channels).toBe(1);
     });
   });
 
-  describe('設定更新', () => {
-    test('設定を更新できる', () => {
+  describe("設定更新", () => {
+    test("設定を更新できる", () => {
       segmenter.updateConfig({ minDuration: 1000 });
 
       const config = segmenter.getConfig();
       expect(config.minDuration).toBe(1000);
     });
 
-    test('部分的な設定更新ができる', () => {
+    test("部分的な設定更新ができる", () => {
       const originalConfig = segmenter.getConfig();
       segmenter.updateConfig({ minDuration: 2000 });
 
@@ -232,8 +234,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('統計情報', () => {
-    test('統計を取得できる', async () => {
+  describe("統計情報", () => {
+    test("統計を取得できる", async () => {
       segmenter.resetStats();
 
       // 正常なセグメント
@@ -260,21 +262,23 @@ describe('AudioSegmenter', () => {
       expect(stats.savedApiCalls).toBe(2);
     });
 
-    test('節約率が計算される', async () => {
+    test("節約率が計算される", async () => {
       segmenter.resetStats();
 
       // 2つ破棄、1つ処理
       const loudPcm = createLoudPcm(1000);
       await segmenter.createSegment(createMockBuffer(1000, loudPcm));
       await segmenter.createSegment(createMockBuffer(300, createLoudPcm(300)));
-      await segmenter.createSegment(createMockBuffer(1000, createSilentPcm(1000)));
+      await segmenter.createSegment(
+        createMockBuffer(1000, createSilentPcm(1000)),
+      );
 
       const stats = segmenter.getStats();
 
-      expect(stats.savingsRate).toBe('66.7%');
+      expect(stats.savingsRate).toBe("66.7%");
     });
 
-    test('統計をリセットできる', async () => {
+    test("統計をリセットできる", async () => {
       const pcmData = createLoudPcm(1000);
       const buffer = createMockBuffer(1000, pcmData);
       await segmenter.createSegment(buffer);
@@ -289,12 +293,12 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('エッジケース', () => {
-    test('空のチャンクでもエラーにならない', async () => {
+  describe("エッジケース", () => {
+    test("空のチャンクでもエラーにならない", async () => {
       const buffer: UserAudioBuffer = {
-        userId: 'user-1',
-        username: 'testuser',
-        displayName: 'Test User',
+        userId: "user-1",
+        username: "testuser",
+        displayName: "Test User",
         startTimestamp: Date.now() - 1000,
         lastActivityTimestamp: Date.now(),
         chunks: [],
@@ -303,11 +307,11 @@ describe('AudioSegmenter', () => {
       await expect(segmenter.createSegment(buffer)).resolves.not.toThrow();
     });
 
-    test('startTimestampがない場合は0を返す', async () => {
+    test("startTimestampがない場合は0を返す", async () => {
       const buffer: UserAudioBuffer = {
-        userId: 'user-1',
-        username: 'testuser',
-        displayName: 'Test User',
+        userId: "user-1",
+        username: "testuser",
+        displayName: "Test User",
         startTimestamp: undefined as unknown as number,
         lastActivityTimestamp: Date.now(),
         chunks: [{ data: createLoudPcm(1000), timestamp: Date.now() }],
@@ -320,16 +324,16 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('複数チャンク', () => {
-    test('複数チャンクが結合される', async () => {
+  describe("複数チャンク", () => {
+    test("複数チャンクが結合される", async () => {
       const now = Date.now();
       const chunk1 = createLoudPcm(500);
       const chunk2 = createLoudPcm(500);
 
       const buffer: UserAudioBuffer = {
-        userId: 'user-1',
-        username: 'testuser',
-        displayName: 'Test User',
+        userId: "user-1",
+        username: "testuser",
+        displayName: "Test User",
         startTimestamp: now - 1000,
         lastActivityTimestamp: now,
         chunks: [
@@ -345,8 +349,8 @@ describe('AudioSegmenter', () => {
     });
   });
 
-  describe('minRmsThreshold設定', () => {
-    test('閾値を変更すると検出感度が変わる', async () => {
+  describe("minRmsThreshold設定", () => {
+    test("閾値を変更すると検出感度が変わる", async () => {
       // 非常に低い閾値のセグメンター
       const sensitiveSegmenter = new AudioSegmenter({
         minDuration: 500,
@@ -366,4 +370,3 @@ describe('AudioSegmenter', () => {
     });
   });
 });
-

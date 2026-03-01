@@ -4,8 +4,8 @@
  * - レイテンシ計測
  * - エラー率
  */
-import { logger } from '../utils/logger.js';
-import type { QueueStatus, TranscriptionMetrics } from '../types/index.js';
+import { logger } from "../utils/logger.js";
+import type { QueueStatus, TranscriptionMetrics } from "../types/index.js";
 
 /**
  * メトリクスコレクター
@@ -25,7 +25,7 @@ export class MetricsCollector {
 
   constructor(maxSamples = 1000) {
     this.maxSamples = maxSamples;
-    logger.debug('MetricsCollector initialized', { maxSamples });
+    logger.debug("MetricsCollector initialized", { maxSamples });
   }
 
   /**
@@ -34,7 +34,7 @@ export class MetricsCollector {
   recordRequest(
     success: boolean,
     processingTimeMs: number,
-    wordCount?: number
+    wordCount?: number,
   ): void {
     this.requestCounts.total++;
 
@@ -147,7 +147,7 @@ export class MetricsCollector {
       retried: 0,
     };
     this.startTime = Date.now();
-    logger.info('Metrics reset');
+    logger.info("Metrics reset");
   }
 
   /**
@@ -155,7 +155,7 @@ export class MetricsCollector {
    */
   logSummary(queueStatus?: QueueStatus): void {
     const metrics = this.getMetrics(queueStatus);
-    logger.info('Transcription Metrics Summary', {
+    logger.info("Transcription Metrics Summary", {
       totalRequests: metrics.totalRequests,
       successRate: `${((1 - metrics.errorRate) * 100).toFixed(1)}%`,
       avgProcessingTime: `${metrics.avgProcessingTimeMs.toFixed(0)}ms`,
@@ -167,8 +167,3 @@ export class MetricsCollector {
 }
 
 export default MetricsCollector;
-
-
-
-
-

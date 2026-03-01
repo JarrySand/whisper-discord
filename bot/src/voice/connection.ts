@@ -2,12 +2,12 @@ import {
   VoiceConnection,
   VoiceConnectionStatus,
   entersState,
-} from '@discordjs/voice';
-import { TextChannel } from 'discord.js';
-import { logger } from '../utils/logger.js';
-import { VoiceReceiverHandler } from './receiver.js';
-import { TranscriptionService } from '../services/transcription-service.js';
-import { formatDuration } from '../utils/time.js';
+} from "@discordjs/voice";
+import { TextChannel } from "discord.js";
+import { logger } from "../utils/logger.js";
+import { VoiceReceiverHandler } from "./receiver.js";
+import { TranscriptionService } from "../services/transcription-service.js";
+import { formatDuration } from "../utils/time.js";
 
 /**
  * 自動離脱設定
@@ -47,7 +47,9 @@ class VoiceConnectionManager {
    */
   setAutoLeaveConfig(config: Partial<AutoLeaveConfig>): void {
     this.autoLeaveConfig = { ...this.autoLeaveConfig, ...config };
-    logger.info(`Auto-leave config updated: enabled=${this.autoLeaveConfig.enabled}`);
+    logger.info(
+      `Auto-leave config updated: enabled=${this.autoLeaveConfig.enabled}`,
+    );
   }
 
   /**
@@ -59,13 +61,17 @@ class VoiceConnectionManager {
     const info = this.connections.get(guildId);
     if (!info) return;
 
-    logger.info(`Voice channel empty in guild ${guildId}. Auto-leaving after queue drain.`);
+    logger.info(
+      `Voice channel empty in guild ${guildId}. Auto-leaving after queue drain.`,
+    );
 
     // 処理中の文字起こしが完了するまで待機（最大30秒）
     if (info.transcriptionService) {
       const queueStatus = info.transcriptionService.getQueueStatus();
       if (queueStatus.queued > 0 || queueStatus.processing > 0) {
-        logger.info(`Waiting for ${queueStatus.queued} queued + ${queueStatus.processing} processing items to complete`);
+        logger.info(
+          `Waiting for ${queueStatus.queued} queued + ${queueStatus.processing} processing items to complete`,
+        );
         await info.transcriptionService.waitForQueueDrain(30000);
       }
     }
@@ -80,9 +86,14 @@ class VoiceConnectionManager {
   /**
    * セッション終了レポートを出力チャンネルに送信
    */
-  private async sendSessionReport(guildId: string, info: ConnectionInfo): Promise<void> {
+  private async sendSessionReport(
+    guildId: string,
+    info: ConnectionInfo,
+  ): Promise<void> {
     if (!info.outputChannel) {
-      logger.debug(`No output channel for guild ${guildId}, skipping session report`);
+      logger.debug(
+        `No output channel for guild ${guildId}, skipping session report`,
+      );
       return;
     }
 
@@ -113,7 +124,9 @@ class VoiceConnectionManager {
         duration: formattedDuration,
       });
     } catch (error) {
-      logger.error(`Failed to send session report for guild ${guildId}`, { error });
+      logger.error(`Failed to send session report for guild ${guildId}`, {
+        error,
+      });
     }
   }
 
@@ -144,7 +157,7 @@ class VoiceConnectionManager {
    */
   addConnection(
     guildId: string,
-    info: Omit<ConnectionInfo, 'transcriptionCount'>
+    info: Omit<ConnectionInfo, "transcriptionCount">,
   ): void {
     const connectionInfo: ConnectionInfo = {
       ...info,
@@ -163,7 +176,7 @@ class VoiceConnectionManager {
       } catch {
         // 再接続失敗 → 切断
         logger.warn(
-          `Voice connection lost in guild ${guildId}. Could not reconnect.`
+          `Voice connection lost in guild ${guildId}. Could not reconnect.`,
         );
         this.removeConnection(guildId);
       }
@@ -200,26 +213,35 @@ class VoiceConnectionManager {
     const info = this.connections.get(guildId);
     if (info) {
       info.receiverHandler = handler;
-      
+
       // DAVE エラー時の接続リセットハンドリング
-      handler.on('connectionResetRequired', async (data: { guildId: string; reason: string; lastError: string }) => {
-        logger.warn('Connection reset required due to DAVE error', data);
-        
-        // 出力チャンネルに通知
-        const connectionInfo = this.connections.get(data.guildId);
-        if (connectionInfo?.outputChannel) {
-          try {
-            await connectionInfo.outputChannel.send(
-              `⚠️ **音声デコードエラーが発生しました**\n` +
-              `暗号化の不整合により音声が正常に受信できません。\n` +
-              `\`/leave\` して30秒以上待ってから \`/join\` してください。`
-            );
-          } catch (err) {
-            logger.error('Failed to send DAVE error notification', { error: err });
+      handler.on(
+        "connectionResetRequired",
+        async (data: {
+          guildId: string;
+          reason: string;
+          lastError: string;
+        }) => {
+          logger.warn("Connection reset required due to DAVE error", data);
+
+          // 出力チャンネルに通知
+          const connectionInfo = this.connections.get(data.guildId);
+          if (connectionInfo?.outputChannel) {
+            try {
+              await connectionInfo.outputChannel.send(
+                `⚠️ **音声デコードエラーが発生しました**\n` +
+                  `暗号化の不整合により音声が正常に受信できません。\n` +
+                  `\`/leave\` して30秒以上待ってから \`/join\` してください。`,
+              );
+            } catch (err) {
+              logger.error("Failed to send DAVE error notification", {
+                error: err,
+              });
+            }
           }
-        }
-      });
-      
+        },
+      );
+
       logger.info(`Set voice receiver handler for guild ${guildId}`);
     }
   }
@@ -234,7 +256,10 @@ class VoiceConnectionManager {
   /**
    * 文字起こしサービスを設定
    */
-  setTranscriptionService(guildId: string, service: TranscriptionService): void {
+  setTranscriptionService(
+    guildId: string,
+    service: TranscriptionService,
+  ): void {
     const info = this.connections.get(guildId);
     if (info) {
       info.transcriptionService = service;
@@ -270,7 +295,7 @@ class VoiceConnectionManager {
       } catch (error) {
         logger.error(
           `Error destroying voice connection for guild ${guildId}:`,
-          error
+          error,
         );
       }
       this.connections.delete(guildId);
@@ -285,7 +310,7 @@ class VoiceConnectionManager {
     for (const guildId of this.connections.keys()) {
       await this.removeConnection(guildId);
     }
-    logger.info('Removed all voice connections');
+    logger.info("Removed all voice connections");
   }
 
   /**
@@ -308,4 +333,3 @@ class VoiceConnectionManager {
 
 // シングルトンインスタンス
 export const connectionManager = new VoiceConnectionManager();
-

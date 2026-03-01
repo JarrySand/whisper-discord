@@ -155,6 +155,7 @@ export const joinCommand: Command = {
         adapterCreator: guild.voiceAdapterCreator as any,
         selfDeaf: false, // 音声を受信するため false
         selfMute: true, // Bot は発言しない
+        daveEncryption: true, // DAVE（E2EE）を有効化
       });
 
       // 接続完了を待機
