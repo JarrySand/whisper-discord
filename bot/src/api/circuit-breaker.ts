@@ -3,26 +3,26 @@
  * - API障害時の自動遮断
  * - 段階的復旧
  */
-import { EventEmitter } from 'events';
-import { logger } from '../utils/logger.js';
-import type { CircuitBreakerConfig } from '../types/index.js';
+import { EventEmitter } from "events";
+import { logger } from "../utils/logger.js";
+import type { CircuitBreakerConfig } from "../types/index.js";
 
 /**
  * サーキットブレーカーの状態
  */
 export enum CircuitState {
-  CLOSED = 'CLOSED', // 正常稼働
-  OPEN = 'OPEN', // 遮断中
-  HALF_OPEN = 'HALF_OPEN', // 試験中
+  CLOSED = "CLOSED", // 正常稼働
+  OPEN = "OPEN", // 遮断中
+  HALF_OPEN = "HALF_OPEN", // 試験中
 }
 
 /**
  * サーキットブレーカーOpenエラー
  */
 export class CircuitBreakerOpenError extends Error {
-  constructor(message = 'Circuit breaker is open') {
+  constructor(message = "Circuit breaker is open") {
     super(message);
-    this.name = 'CircuitBreakerOpenError';
+    this.name = "CircuitBreakerOpenError";
   }
 }
 
@@ -46,7 +46,7 @@ export class CircuitBreaker extends EventEmitter {
       monitoringPeriod: config.monitoringPeriod ?? 60000,
     };
 
-    logger.debug('CircuitBreaker initialized', { config: this.config });
+    logger.debug("CircuitBreaker initialized", { config: this.config });
   }
 
   /**
@@ -81,7 +81,7 @@ export class CircuitBreaker extends EventEmitter {
     if (this.state === CircuitState.HALF_OPEN) {
       this.successes++;
       logger.debug(
-        `Circuit breaker: success in HALF_OPEN (${this.successes}/${this.config.successThreshold})`
+        `Circuit breaker: success in HALF_OPEN (${this.successes}/${this.config.successThreshold})`,
       );
 
       if (this.successes >= this.config.successThreshold) {
@@ -108,7 +108,9 @@ export class CircuitBreaker extends EventEmitter {
       this.transitionTo(CircuitState.OPEN);
     }
 
-    logger.debug(`Circuit breaker: failure (${this.failures}/${this.config.failureThreshold})`);
+    logger.debug(
+      `Circuit breaker: failure (${this.failures}/${this.config.failureThreshold})`,
+    );
   }
 
   /**
@@ -127,14 +129,14 @@ export class CircuitBreaker extends EventEmitter {
     this.lastStateChange = Date.now();
 
     logger.info(`Circuit breaker state change: ${oldState} -> ${newState}`);
-    this.emit('stateChange', { oldState, newState });
+    this.emit("stateChange", { oldState, newState });
 
     if (newState === CircuitState.OPEN) {
-      this.emit('open');
+      this.emit("open");
     } else if (newState === CircuitState.CLOSED) {
-      this.emit('close');
+      this.emit("close");
     } else if (newState === CircuitState.HALF_OPEN) {
-      this.emit('halfOpen');
+      this.emit("halfOpen");
     }
   }
 
@@ -168,8 +170,8 @@ export class CircuitBreaker extends EventEmitter {
     this.successes = 0;
     this.lastFailureTime = 0;
     this.lastStateChange = Date.now();
-    logger.info('Circuit breaker reset');
-    this.emit('reset');
+    logger.info("Circuit breaker reset");
+    this.emit("reset");
   }
 
   /**
@@ -193,8 +195,3 @@ export class CircuitBreaker extends EventEmitter {
 }
 
 export default CircuitBreaker;
-
-
-
-
-

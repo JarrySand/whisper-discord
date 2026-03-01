@@ -1,6 +1,6 @@
 /**
  * TranscriptionService テスト
- * 
+ *
  * テスト項目:
  * - サービス開始/停止
  * - セグメント処理
@@ -8,20 +8,22 @@
  * - イベント発火
  * - オフラインハンドリング
  */
-import { TranscriptionService } from '../../services/transcription-service.js';
-import type { AudioSegment } from '../../types/index.js';
+import { TranscriptionService } from "../../services/transcription-service.js";
+import type { AudioSegment } from "../../types/index.js";
 
 // 依存モジュールをモック
-jest.mock('../../api/whisper-client.js', () => ({
+jest.mock("../../api/whisper-client.js", () => ({
   WhisperClient: jest.fn().mockImplementation(() => ({
     transcribe: jest.fn(),
-    healthCheck: jest.fn().mockResolvedValue({ status: 'healthy' }),
-    getHealthStatus: jest.fn().mockReturnValue({ isHealthy: true, lastCheck: Date.now() }),
+    healthCheck: jest.fn().mockResolvedValue({ status: "healthy" }),
+    getHealthStatus: jest
+      .fn()
+      .mockReturnValue({ isHealthy: true, lastCheck: Date.now() }),
   })),
 }));
 
-jest.mock('../../api/queue.js', () => ({
-  TranscriptionQueue: jest.fn().mockImplementation(function(this: any) {
+jest.mock("../../api/queue.js", () => ({
+  TranscriptionQueue: jest.fn().mockImplementation(function (this: any) {
     this.eventHandlers = new Map();
     this.on = jest.fn((event: string, handler: (...args: any[]) => void) => {
       this.eventHandlers.set(event, handler);
@@ -42,28 +44,28 @@ jest.mock('../../api/queue.js', () => ({
   }),
 }));
 
-jest.mock('../../api/circuit-breaker.js', () => ({
-  CircuitBreaker: jest.fn().mockImplementation(function(this: any) {
+jest.mock("../../api/circuit-breaker.js", () => ({
+  CircuitBreaker: jest.fn().mockImplementation(function (this: any) {
     this.eventHandlers = new Map();
     this.on = jest.fn((event: string, handler: (...args: any[]) => void) => {
       this.eventHandlers.set(event, handler);
     });
-    this.getState = jest.fn().mockReturnValue('CLOSED');
+    this.getState = jest.fn().mockReturnValue("CLOSED");
     this.getStatus = jest.fn().mockReturnValue({
-      state: 'CLOSED',
+      state: "CLOSED",
       failures: 0,
       successes: 0,
     });
   }),
   CircuitState: {
-    CLOSED: 'CLOSED',
-    OPEN: 'OPEN',
-    HALF_OPEN: 'HALF_OPEN',
+    CLOSED: "CLOSED",
+    OPEN: "OPEN",
+    HALF_OPEN: "HALF_OPEN",
   },
 }));
 
-jest.mock('../../api/health-monitor.js', () => ({
-  HealthMonitor: jest.fn().mockImplementation(function(this: any) {
+jest.mock("../../api/health-monitor.js", () => ({
+  HealthMonitor: jest.fn().mockImplementation(function (this: any) {
     this.eventHandlers = new Map();
     this.on = jest.fn((event: string, handler: (...args: any[]) => void) => {
       this.eventHandlers.set(event, handler);
@@ -77,7 +79,7 @@ jest.mock('../../api/health-monitor.js', () => ({
   }),
 }));
 
-jest.mock('../../api/offline-handler.js', () => ({
+jest.mock("../../api/offline-handler.js", () => ({
   OfflineHandler: jest.fn().mockImplementation(() => ({
     saveForLater: jest.fn().mockResolvedValue(undefined),
     processQueue: jest.fn().mockResolvedValue({ processed: 0, failed: 0 }),
@@ -85,7 +87,7 @@ jest.mock('../../api/offline-handler.js', () => ({
   })),
 }));
 
-jest.mock('../../api/metrics.js', () => ({
+jest.mock("../../api/metrics.js", () => ({
   MetricsCollector: jest.fn().mockImplementation(() => ({
     recordRequest: jest.fn(),
     recordQueueWait: jest.fn(),
@@ -99,7 +101,7 @@ jest.mock('../../api/metrics.js', () => ({
   })),
 }));
 
-jest.mock('../../output/manager.js', () => ({
+jest.mock("../../output/manager.js", () => ({
   OutputManager: jest.fn().mockImplementation(() => ({
     startSession: jest.fn().mockResolvedValue(undefined),
     endSession: jest.fn().mockResolvedValue(undefined),
@@ -116,18 +118,20 @@ jest.mock('../../output/manager.js', () => ({
 /**
  * モックのAudioSegmentを作成
  */
-function createMockSegment(overrides: Partial<AudioSegment> = {}): AudioSegment {
+function createMockSegment(
+  overrides: Partial<AudioSegment> = {},
+): AudioSegment {
   const now = Date.now();
   return {
     id: `seg-${Math.random().toString(36).slice(2, 10)}`,
-    userId: 'user-1',
-    username: 'testuser',
-    displayName: 'Test User',
+    userId: "user-1",
+    username: "testuser",
+    displayName: "Test User",
     startTimestamp: now - 3000,
     endTimestamp: now,
     duration: 3000,
-    audioData: Buffer.from('mock-audio'),
-    audioFormat: 'ogg',
+    audioData: Buffer.from("mock-audio"),
+    audioFormat: "ogg",
     sampleRate: 16000,
     channels: 1,
     bitrate: 32000,
@@ -135,7 +139,7 @@ function createMockSegment(overrides: Partial<AudioSegment> = {}): AudioSegment 
   };
 }
 
-describe('TranscriptionService', () => {
+describe("TranscriptionService", () => {
   let service: TranscriptionService;
 
   beforeEach(() => {
@@ -150,12 +154,12 @@ describe('TranscriptionService', () => {
     }
   });
 
-  describe('初期化', () => {
-    test('正常に初期化される', () => {
+  describe("初期化", () => {
+    test("正常に初期化される", () => {
       expect(service).toBeInstanceOf(TranscriptionService);
     });
 
-    test('出力マネージャー付きで初期化される', () => {
+    test("出力マネージャー付きで初期化される", () => {
       const serviceWithOutput = new TranscriptionService({
         output: {
           discord: { enabled: false, config: {} },
@@ -170,20 +174,20 @@ describe('TranscriptionService', () => {
     });
   });
 
-  describe('サービス開始/停止', () => {
+  describe("サービス開始/停止", () => {
     const createSessionContext = (overrides = {}) => ({
-      guildId: 'guild-1',
-      channelId: 'channel-1',
-      guildName: 'Test Guild',
-      channelName: 'general',
+      guildId: "guild-1",
+      channelId: "channel-1",
+      guildName: "Test Guild",
+      channelName: "general",
       startedAt: new Date(),
       participants: new Map(),
       ...overrides,
     });
 
-    test('サービスを開始できる', async () => {
+    test("サービスを開始できる", async () => {
       const startedHandler = jest.fn();
-      service.on('started', startedHandler);
+      service.on("started", startedHandler);
 
       await service.start(createSessionContext());
 
@@ -192,9 +196,9 @@ describe('TranscriptionService', () => {
       expect(startedHandler).toHaveBeenCalled();
     });
 
-    test('サービスを停止できる', async () => {
+    test("サービスを停止できる", async () => {
       const stoppedHandler = jest.fn();
-      service.on('stopped', stoppedHandler);
+      service.on("stopped", stoppedHandler);
 
       await service.start(createSessionContext());
 
@@ -205,33 +209,33 @@ describe('TranscriptionService', () => {
       expect(stoppedHandler).toHaveBeenCalled();
     });
 
-    test('重複した開始は無視される', async () => {
-      await service.start(createSessionContext({ guildId: 'guild-1' }));
+    test("重複した開始は無視される", async () => {
+      await service.start(createSessionContext({ guildId: "guild-1" }));
 
       // 2回目の開始
-      await service.start(createSessionContext({ guildId: 'guild-2' }));
+      await service.start(createSessionContext({ guildId: "guild-2" }));
 
       const status = service.getStatus();
-      expect(status.sessionContext?.guildId).toBe('guild-1');
+      expect(status.sessionContext?.guildId).toBe("guild-1");
     });
 
-    test('停止していないサービスの停止は何もしない', async () => {
+    test("停止していないサービスの停止は何もしない", async () => {
       await expect(service.stop()).resolves.not.toThrow();
     });
   });
 
-  describe('セグメント処理', () => {
+  describe("セグメント処理", () => {
     const createSessionContext = (overrides = {}) => ({
-      guildId: 'guild-1',
-      channelId: 'channel-1',
-      guildName: 'Test Guild',
-      channelName: 'general',
+      guildId: "guild-1",
+      channelId: "channel-1",
+      guildName: "Test Guild",
+      channelName: "general",
       startedAt: new Date(),
       participants: new Map(),
       ...overrides,
     });
 
-    test('セグメントをキューに追加できる', async () => {
+    test("セグメントをキューに追加できる", async () => {
       await service.start(createSessionContext());
 
       await service.transcribe(createMockSegment());
@@ -241,25 +245,25 @@ describe('TranscriptionService', () => {
       expect(status).toBeDefined();
     });
 
-    test('サービス停止中はセグメントを処理しない', async () => {
+    test("サービス停止中はセグメントを処理しない", async () => {
       await service.transcribe(createMockSegment());
 
       // エラーなく完了すること
     });
   });
 
-  describe('ステータス取得', () => {
+  describe("ステータス取得", () => {
     const createSessionContext = (overrides = {}) => ({
-      guildId: 'guild-1',
-      channelId: 'channel-1',
-      guildName: 'Test Guild',
-      channelName: 'general',
+      guildId: "guild-1",
+      channelId: "channel-1",
+      guildName: "Test Guild",
+      channelName: "general",
       startedAt: new Date(),
       participants: new Map(),
       ...overrides,
     });
 
-    test('ステータスを取得できる', async () => {
+    test("ステータスを取得できる", async () => {
       await service.start(createSessionContext());
 
       const status = service.getStatus();
@@ -271,20 +275,20 @@ describe('TranscriptionService', () => {
       expect(status.health).toBeDefined();
     });
 
-    test('メトリクスを取得できる', () => {
+    test("メトリクスを取得できる", () => {
       const metrics = service.getMetrics();
 
       expect(metrics).toBeDefined();
       expect(metrics.totalRequests).toBeDefined();
     });
 
-    test('キューステータスを取得できる', () => {
+    test("キューステータスを取得できる", () => {
       const queueStatus = service.getQueueStatus();
 
       expect(queueStatus).toBeDefined();
     });
 
-    test('ヘルスステータスを取得できる', () => {
+    test("ヘルスステータスを取得できる", () => {
       const healthStatus = service.getHealthStatus();
 
       expect(healthStatus).toBeDefined();
@@ -292,14 +296,14 @@ describe('TranscriptionService', () => {
     });
   });
 
-  describe('出力マネージャー', () => {
-    test('出力マネージャーを取得できる', () => {
+  describe("出力マネージャー", () => {
+    test("出力マネージャーを取得できる", () => {
       const manager = service.getOutputManager();
       // 初期化時に出力設定がない場合はnull
       expect(manager).toBeNull();
     });
 
-    test('出力マネージャーを設定できる', () => {
+    test("出力マネージャーを設定できる", () => {
       const mockManager = {
         startSession: jest.fn(),
         endSession: jest.fn(),
@@ -313,43 +317,42 @@ describe('TranscriptionService', () => {
     });
   });
 
-  describe('イベント発火', () => {
-    test('apiUnhealthyイベントが発火する', async () => {
+  describe("イベント発火", () => {
+    test("apiUnhealthyイベントが発火する", async () => {
       const unhealthyHandler = jest.fn();
-      service.on('apiUnhealthy', unhealthyHandler);
+      service.on("apiUnhealthy", unhealthyHandler);
 
       // ヘルスモニターのunhealthyイベントをシミュレート
       // （実際のイベントはモック内で設定されたハンドラから発火される）
     });
 
-    test('apiHealthyイベントが発火する', async () => {
+    test("apiHealthyイベントが発火する", async () => {
       const healthyHandler = jest.fn();
-      service.on('apiHealthy', healthyHandler);
+      service.on("apiHealthy", healthyHandler);
 
       // ヘルスモニターのhealthyイベントをシミュレート
     });
 
-    test('circuitOpenイベントが発火する', async () => {
+    test("circuitOpenイベントが発火する", async () => {
       const openHandler = jest.fn();
-      service.on('circuitOpen', openHandler);
+      service.on("circuitOpen", openHandler);
 
       // サーキットブレーカーのopenイベントをシミュレート
     });
   });
 });
 
-describe('TranscriptionService フィルター統合', () => {
+describe("TranscriptionService フィルター統合", () => {
   // フィルターのテストは個別のフィルターテストでカバーされているため、
   // ここでは統合動作を確認
 
-  test('相槌フィルターが適用される', () => {
+  test("相槌フィルターが適用される", () => {
     // 相槌フィルターの動作は aizuchi-filter.test.ts でテスト済み
     expect(true).toBe(true);
   });
 
-  test('ハルシネーションフィルターが適用される', () => {
+  test("ハルシネーションフィルターが適用される", () => {
     // ハルシネーションフィルターの動作は hallucination-filter.test.ts でテスト済み
     expect(true).toBe(true);
   });
 });
-

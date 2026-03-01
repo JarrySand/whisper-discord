@@ -6,17 +6,17 @@ import {
   REST,
   Routes,
   VoiceState,
-} from 'discord.js';
-import { botConfig } from './config/index.js';
-import { logger } from './utils/logger.js';
-import type { Command } from './types/index.js';
-import { commands, setSqliteStoreManager } from './commands/index.js';
-import { connectionManager } from './voice/connection.js';
-import { guildSettings } from './services/guild-settings.js';
-import { guildApiKeys } from './services/guild-api-keys.js';
-import { guildPrompts } from './services/guild-prompt.js';
+} from "discord.js";
+import { botConfig } from "./config/index.js";
+import { logger } from "./utils/logger.js";
+import type { Command } from "./types/index.js";
+import { commands, setSqliteStoreManager } from "./commands/index.js";
+import { connectionManager } from "./voice/connection.js";
+import { guildSettings } from "./services/guild-settings.js";
+import { guildApiKeys } from "./services/guild-api-keys.js";
+import { guildPrompts } from "./services/guild-prompt.js";
 // SQLite は条件付きで動的インポート（メモリ節約）
-type SqliteStoreManager = import('./output/sqlite-store.js').SqliteStoreManager;
+type SqliteStoreManager = import("./output/sqlite-store.js").SqliteStoreManager;
 
 /**
  * Discord Bot クラス
@@ -46,17 +46,17 @@ export class Bot {
    */
   private async initSqlite(): Promise<void> {
     try {
-      const { SqliteStoreManager } = await import('./output/sqlite-store.js');
+      const { SqliteStoreManager } = await import("./output/sqlite-store.js");
       this.sqliteStoreManager = new SqliteStoreManager(
         botConfig.output.sqliteDbDir,
-        botConfig.output.sqliteCleanupDays
+        botConfig.output.sqliteCleanupDays,
       );
       setSqliteStoreManager(this.sqliteStoreManager);
-      logger.info('SQLite store manager initialized', { 
-        dbDir: botConfig.output.sqliteDbDir 
+      logger.info("SQLite store manager initialized", {
+        dbDir: botConfig.output.sqliteDbDir,
       });
     } catch (error) {
-      logger.error('Failed to initialize SQLite store manager', { error });
+      logger.error("Failed to initialize SQLite store manager", { error });
     }
   }
 
@@ -94,46 +94,61 @@ export class Bot {
 
       try {
         logger.info(
-          `Executing command: /${interaction.commandName} by ${interaction.user.tag}`
+          `Executing command: /${interaction.commandName} by ${interaction.user.tag}`,
         );
         await command.execute(interaction);
       } catch (error) {
-        logger.error(`Error executing command /${interaction.commandName}:`, error);
+        logger.error(
+          `Error executing command /${interaction.commandName}:`,
+          error,
+        );
 
-        const errorMessage = '❌ コマンドの実行中にエラーが発生しました';
+        const errorMessage = "❌ コマンドの実行中にエラーが発生しました";
 
         try {
           if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: errorMessage, ephemeral: true });
+            await interaction.followUp({
+              content: errorMessage,
+              ephemeral: true,
+            });
           } else {
             await interaction.reply({ content: errorMessage, ephemeral: true });
           }
         } catch (replyError) {
           // 応答に失敗した場合は無視（すでに応答済みの可能性）
-          logger.debug('Failed to send error response to interaction:', replyError);
+          logger.debug(
+            "Failed to send error response to interaction:",
+            replyError,
+          );
         }
       }
     });
 
     // VoiceStateUpdate イベント（自動離脱監視）
-    this.client.on(Events.VoiceStateUpdate, (oldState: VoiceState, newState: VoiceState) => {
-      this.handleVoiceStateUpdate(oldState, newState);
-    });
+    this.client.on(
+      Events.VoiceStateUpdate,
+      (oldState: VoiceState, newState: VoiceState) => {
+        this.handleVoiceStateUpdate(oldState, newState);
+      },
+    );
 
     // エラーハンドリング
     this.client.on(Events.Error, (error) => {
-      logger.error('Discord client error:', error);
+      logger.error("Discord client error:", error);
     });
 
     this.client.on(Events.Warn, (warning) => {
-      logger.warn('Discord client warning:', warning);
+      logger.warn("Discord client warning:", warning);
     });
   }
 
   /**
    * VoiceStateUpdate を処理（自動離脱監視）
    */
-  private handleVoiceStateUpdate(oldState: VoiceState, newState: VoiceState): void {
+  private handleVoiceStateUpdate(
+    oldState: VoiceState,
+    newState: VoiceState,
+  ): void {
     const guildId = oldState.guild.id;
 
     // Bot が接続しているギルドかチェック
@@ -143,12 +158,18 @@ export class Bot {
     const botChannelId = connectionInfo.channelId;
 
     // Bot のチャンネルに関係のない変更は無視
-    if (oldState.channelId !== botChannelId && newState.channelId !== botChannelId) {
+    if (
+      oldState.channelId !== botChannelId &&
+      newState.channelId !== botChannelId
+    ) {
       return;
     }
 
     // Bot 自身の状態変更は無視
-    if (oldState.member?.user.bot && oldState.member.id === this.client.user?.id) {
+    if (
+      oldState.member?.user.bot &&
+      oldState.member.id === this.client.user?.id
+    ) {
       return;
     }
 
@@ -156,10 +177,12 @@ export class Bot {
     const channel = oldState.guild.channels.cache.get(botChannelId);
     if (!channel || !channel.isVoiceBased()) return;
 
-    const humanMembers = channel.members.filter(member => !member.user.bot);
+    const humanMembers = channel.members.filter((member) => !member.user.bot);
     const humanCount = humanMembers.size;
 
-    logger.debug(`Voice state update in ${connectionInfo.channelName}: ${humanCount} human member(s)`);
+    logger.debug(
+      `Voice state update in ${connectionInfo.channelName}: ${humanCount} human member(s)`,
+    );
 
     if (humanCount === 0) {
       // 誰もいなくなった → 即時自動退出（レポート生成含む）
@@ -172,10 +195,10 @@ export class Bot {
    * スラッシュコマンドを登録
    */
   async registerCommands(): Promise<void> {
-    const rest = new REST({ version: '10' }).setToken(botConfig.token);
+    const rest = new REST({ version: "10" }).setToken(botConfig.token);
 
     try {
-      logger.info('Registering slash commands...');
+      logger.info("Registering slash commands...");
 
       const commandData = commands.map((cmd) => cmd.data.toJSON());
 
@@ -185,7 +208,7 @@ export class Bot {
 
       logger.info(`✅ Successfully registered ${commandData.length} commands`);
     } catch (error) {
-      logger.error('Failed to register commands:', error);
+      logger.error("Failed to register commands:", error);
       throw error;
     }
   }
@@ -195,13 +218,13 @@ export class Bot {
    */
   async start(): Promise<void> {
     try {
-      logger.info('Starting bot...');
-      
+      logger.info("Starting bot...");
+
       // SQLite を初期化（有効な場合）
       if (botConfig.output.enableSqlite) {
         await this.initSqlite();
       }
-      
+
       // サーバー設定を初期化
       await guildSettings.initialize();
 
@@ -213,7 +236,7 @@ export class Bot {
 
       await this.client.login(botConfig.token);
     } catch (error) {
-      logger.error('Failed to start bot:', error);
+      logger.error("Failed to start bot:", error);
       throw error;
     }
   }
@@ -222,7 +245,7 @@ export class Bot {
    * Bot を停止（Graceful shutdown）
    */
   async stop(): Promise<void> {
-    logger.info('Stopping bot...');
+    logger.info("Stopping bot...");
 
     // すべてのVC接続を切断（文字起こしサービスの停止含む）
     await connectionManager.removeAllConnections();
@@ -245,7 +268,7 @@ export class Bot {
 
     this.client.destroy();
     this.isReady = false;
-    logger.info('Bot stopped');
+    logger.info("Bot stopped");
   }
 
   /**
@@ -264,4 +287,3 @@ export class Bot {
 }
 
 export default Bot;
-

@@ -1,6 +1,6 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import { logger } from '../utils/logger.js';
+import { promises as fs } from "fs";
+import path from "path";
+import { logger } from "../utils/logger.js";
 
 /**
  * Guild別プロンプト設定
@@ -36,10 +36,10 @@ class GuildPromptManager {
 
   constructor() {
     this.data = {
-      version: '1.0',
+      version: "1.0",
       guilds: {},
     };
-    this.dataPath = path.join(process.cwd(), 'data', 'guild-prompts.json');
+    this.dataPath = path.join(process.cwd(), "data", "guild-prompts.json");
   }
 
   /**
@@ -55,17 +55,19 @@ class GuildPromptManager {
 
       // Guild固有データを読み込み
       try {
-        const content = await fs.readFile(this.dataPath, 'utf-8');
+        const content = await fs.readFile(this.dataPath, "utf-8");
         this.data = JSON.parse(content) as GuildPromptData;
-        logger.info(`Guild prompts loaded: ${Object.keys(this.data.guilds).length} guilds`);
+        logger.info(
+          `Guild prompts loaded: ${Object.keys(this.data.guilds).length} guilds`,
+        );
       } catch {
-        logger.info('Guild prompts file not found, creating new one');
+        logger.info("Guild prompts file not found, creating new one");
         await this.save();
       }
 
       this.initialized = true;
     } catch (error) {
-      logger.error('Failed to initialize guild prompts:', error);
+      logger.error("Failed to initialize guild prompts:", error);
       throw error;
     }
   }
@@ -76,12 +78,12 @@ class GuildPromptManager {
   setPrompt(
     guildId: string,
     prompt: string,
-    userId: string
+    userId: string,
   ): { success: boolean; error?: string } {
     const trimmedPrompt = prompt.trim();
 
     if (trimmedPrompt.length === 0) {
-      return { success: false, error: 'プロンプトが空です' };
+      return { success: false, error: "プロンプトが空です" };
     }
 
     if (trimmedPrompt.length > MAX_PROMPT_LENGTH) {
@@ -120,7 +122,9 @@ class GuildPromptManager {
    * プロンプトが設定されているか
    */
   hasPrompt(guildId: string): boolean {
-    return guildId in this.data.guilds && this.data.guilds[guildId].prompt.length > 0;
+    return (
+      guildId in this.data.guilds && this.data.guilds[guildId].prompt.length > 0
+    );
   }
 
   /**
@@ -154,10 +158,14 @@ class GuildPromptManager {
    */
   async save(): Promise<void> {
     try {
-      await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2), 'utf-8');
-      logger.debug('Guild prompts saved');
+      await fs.writeFile(
+        this.dataPath,
+        JSON.stringify(this.data, null, 2),
+        "utf-8",
+      );
+      logger.debug("Guild prompts saved");
     } catch (error) {
-      logger.error('Failed to save guild prompts:', error);
+      logger.error("Failed to save guild prompts:", error);
     }
   }
 }

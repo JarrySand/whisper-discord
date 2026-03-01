@@ -3,10 +3,10 @@
  * - API接続不可時のセグメント保存
  * - 復旧時の再処理
  */
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { logger } from '../utils/logger.js';
-import type { AudioSegment } from '../types/index.js';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { logger } from "../utils/logger.js";
+import type { AudioSegment } from "../types/index.js";
 
 /**
  * オフラインセグメントデータ（保存形式）
@@ -20,7 +20,7 @@ interface OfflineSegmentData {
   endTimestamp: number;
   duration: number;
   audioDataBase64: string;
-  audioFormat: 'ogg' | 'wav';
+  audioFormat: "ogg" | "wav";
   audioPath?: string;
   sampleRate: number;
   channels: number;
@@ -45,11 +45,11 @@ export class OfflineHandler {
 
   constructor(config: Partial<OfflineHandlerConfig> = {}) {
     this.config = {
-      directory: config.directory ?? './offline_queue',
+      directory: config.directory ?? "./offline_queue",
       maxAgeMs: config.maxAgeMs ?? 24 * 60 * 60 * 1000, // 24時間
     };
 
-    logger.debug('OfflineHandler initialized', { config: this.config });
+    logger.debug("OfflineHandler initialized", { config: this.config });
   }
 
   /**
@@ -66,7 +66,7 @@ export class OfflineHandler {
       startTimestamp: segment.startTimestamp,
       endTimestamp: segment.endTimestamp,
       duration: segment.duration,
-      audioDataBase64: segment.audioData.toString('base64'),
+      audioDataBase64: segment.audioData.toString("base64"),
       audioFormat: segment.audioFormat,
       audioPath: segment.audioPath,
       sampleRate: segment.sampleRate,
@@ -78,7 +78,7 @@ export class OfflineHandler {
     const filename = `${segment.id}.json`;
     const filepath = path.join(this.config.directory, filename);
 
-    await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.writeFile(filepath, JSON.stringify(data, null, 2), "utf-8");
     this.pendingCount++;
 
     logger.info(`Segment saved for later: ${segment.id}`, {
@@ -98,11 +98,11 @@ export class OfflineHandler {
       const now = Date.now();
 
       for (const file of files) {
-        if (!file.endsWith('.json')) continue;
+        if (!file.endsWith(".json")) continue;
 
         const filepath = path.join(this.config.directory, file);
         try {
-          const content = await fs.readFile(filepath, 'utf-8');
+          const content = await fs.readFile(filepath, "utf-8");
           const data: OfflineSegmentData = JSON.parse(content);
 
           // 古すぎるセグメントは削除
@@ -120,7 +120,7 @@ export class OfflineHandler {
             startTimestamp: data.startTimestamp,
             endTimestamp: data.endTimestamp,
             duration: data.duration,
-            audioData: Buffer.from(data.audioDataBase64, 'base64'),
+            audioData: Buffer.from(data.audioDataBase64, "base64"),
             audioFormat: data.audioFormat,
             audioPath: data.audioPath,
             sampleRate: data.sampleRate,
@@ -141,7 +141,7 @@ export class OfflineHandler {
       logger.info(`Loaded ${segments.length} pending segments`);
       return segments;
     } catch (error) {
-      logger.error('Failed to load pending segments', {
+      logger.error("Failed to load pending segments", {
         error: (error as Error).message,
       });
       return [];
@@ -166,7 +166,7 @@ export class OfflineHandler {
    * オフラインキューを処理
    */
   async processQueue(
-    processor: (segment: AudioSegment) => Promise<boolean>
+    processor: (segment: AudioSegment) => Promise<boolean>,
   ): Promise<{ processed: number; failed: number }> {
     const segments = await this.loadPending();
     let processed = 0;
@@ -189,7 +189,9 @@ export class OfflineHandler {
       }
     }
 
-    logger.info(`Offline queue processed: ${processed} success, ${failed} failed`);
+    logger.info(
+      `Offline queue processed: ${processed} success, ${failed} failed`,
+    );
     return { processed, failed };
   }
 
@@ -209,7 +211,7 @@ export class OfflineHandler {
       let count = 0;
 
       for (const file of files) {
-        if (file.endsWith('.json')) {
+        if (file.endsWith(".json")) {
           await fs.unlink(path.join(this.config.directory, file));
           count++;
         }
@@ -225,8 +227,3 @@ export class OfflineHandler {
 }
 
 export default OfflineHandler;
-
-
-
-
-

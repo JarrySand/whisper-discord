@@ -3,26 +3,26 @@
  * - 環境変数に基づいてプロバイダーを選択
  * - self-hosted, groq, openai をサポート
  */
-import axios, { AxiosInstance, isAxiosError } from 'axios';
-import FormData from 'form-data';
-import { logger } from '../utils/logger.js';
-import { botConfig } from '../config/index.js';
-import { createProviderForGuild } from './providers/index.js';
+import axios, { AxiosInstance, isAxiosError } from "axios";
+import FormData from "form-data";
+import { logger } from "../utils/logger.js";
+import { botConfig } from "../config/index.js";
+import { createProviderForGuild } from "./providers/index.js";
 import type {
   TranscriptionProvider,
   TranscriptionRequest,
   TranscriptionResponse,
-} from './transcription-provider.js';
+} from "./transcription-provider.js";
 import type {
   WhisperClientConfig,
   TranscribeRequest,
   TranscribeResponse,
   HealthCheckResponse,
-} from '../types/index.js';
+} from "../types/index.js";
 
 /**
  * Whisper APIクライアント
- * 
+ *
  * 環境変数 TRANSCRIPTION_PROVIDER に基づいてプロバイダーを選択:
  * - "self-hosted" または未設定: セルフホスト Whisper API
  * - "groq": Groq Whisper API
@@ -33,13 +33,13 @@ export class WhisperClient {
   private config: WhisperClientConfig;
   private isHealthy = true;
   private lastHealthCheck = 0;
-  
+
   // 新しいプロバイダーシステム
   private provider: TranscriptionProvider | null = null;
   private providerType: string;
 
   constructor(config: Partial<WhisperClientConfig> = {}, guildId?: string) {
-    this.providerType = 'self-hosted';
+    this.providerType = "self-hosted";
 
     this.config = {
       baseUrl: config.baseUrl ?? botConfig.whisper.apiUrl,
@@ -52,15 +52,21 @@ export class WhisperClient {
     // Guild別プロバイダーを使用（guildIdが指定されている場合）
     if (guildId) {
       this.provider = createProviderForGuild(guildId);
-      this.providerType = this.provider.constructor.name.replace('Provider', '').toLowerCase();
-      logger.info(`WhisperClient initialized with guild-specific provider for ${guildId}: ${this.providerType}`);
+      this.providerType = this.provider.constructor.name
+        .replace("Provider", "")
+        .toLowerCase();
+      logger.info(
+        `WhisperClient initialized with guild-specific provider for ${guildId}: ${this.providerType}`,
+      );
     } else {
       // guildIdがない場合はセルフホスト Whisper API を使用（ヘルスチェック等のユーティリティ用）
       this.client = axios.create({
         baseURL: this.config.baseUrl,
         timeout: this.config.timeout,
       });
-      logger.info(`WhisperClient initialized with self-hosted API: ${this.config.baseUrl}`);
+      logger.info(
+        `WhisperClient initialized with self-hosted API: ${this.config.baseUrl}`,
+      );
     }
   }
 
@@ -80,22 +86,25 @@ export class WhisperClient {
   /**
    * クラウドプロバイダーで文字起こし
    */
-  private async transcribeWithProvider(request: TranscribeRequest): Promise<TranscribeResponse> {
+  private async transcribeWithProvider(
+    request: TranscribeRequest,
+  ): Promise<TranscribeResponse> {
     if (!this.provider) {
-      throw new Error('Provider not initialized');
+      throw new Error("Provider not initialized");
     }
 
     const providerRequest: TranscriptionRequest = {
       audioData: request.audioData,
       audioFormat: request.audioFormat,
-      language: request.language ?? 'ja',
+      language: request.language ?? "ja",
       userId: request.userId,
       username: request.username,
       prompt: request.prompt,
     };
 
     const startTime = Date.now();
-    const response: TranscriptionResponse = await this.provider.transcribe(providerRequest);
+    const response: TranscriptionResponse =
+      await this.provider.transcribe(providerRequest);
     const processingTime = Date.now() - startTime;
 
     if (response.success) {
@@ -105,11 +114,11 @@ export class WhisperClient {
           user_id: request.userId,
           username: request.username,
           display_name: request.displayName ?? null,
-          text: response.text ?? '',
+          text: response.text ?? "",
           start_ts: request.startTs,
           end_ts: request.endTs,
           duration_ms: request.endTs - request.startTs,
-          language: response.language ?? 'ja',
+          language: response.language ?? "ja",
           confidence: response.confidence ?? 0.9,
           processing_time_ms: processingTime,
         },
@@ -118,8 +127,8 @@ export class WhisperClient {
       return {
         success: false,
         error: {
-          code: response.error?.code ?? 'TRANSCRIPTION_FAILED',
-          message: response.error?.message ?? 'Transcription failed',
+          code: response.error?.code ?? "TRANSCRIPTION_FAILED",
+          message: response.error?.message ?? "Transcription failed",
         },
       };
     }
@@ -128,41 +137,43 @@ export class WhisperClient {
   /**
    * セルフホスト Whisper API で文字起こし
    */
-  private async transcribeWithSelfHosted(request: TranscribeRequest): Promise<TranscribeResponse> {
+  private async transcribeWithSelfHosted(
+    request: TranscribeRequest,
+  ): Promise<TranscribeResponse> {
     if (!this.client) {
-      throw new Error('HTTP client not initialized');
+      throw new Error("HTTP client not initialized");
     }
 
     const formData = new FormData();
 
     // 音声ファイル
-    formData.append('audio_file', request.audioData, {
+    formData.append("audio_file", request.audioData, {
       filename: `segment.${request.audioFormat}`,
-      contentType: `audio/${request.audioFormat === 'ogg' ? 'ogg' : 'wav'}`,
+      contentType: `audio/${request.audioFormat === "ogg" ? "ogg" : "wav"}`,
     });
 
     // メタデータ
-    formData.append('user_id', request.userId);
-    formData.append('username', request.username);
+    formData.append("user_id", request.userId);
+    formData.append("username", request.username);
     if (request.displayName) {
-      formData.append('display_name', request.displayName);
+      formData.append("display_name", request.displayName);
     }
-    formData.append('start_ts', request.startTs.toString());
-    formData.append('end_ts', request.endTs.toString());
-    formData.append('language', request.language ?? 'ja');
+    formData.append("start_ts", request.startTs.toString());
+    formData.append("end_ts", request.endTs.toString());
+    formData.append("language", request.language ?? "ja");
 
     // プロンプト
     if (request.prompt) {
-      formData.append('prompt', request.prompt);
+      formData.append("prompt", request.prompt);
     }
 
     return this.executeWithRetry(async () => {
       const response = await this.client!.post<TranscribeResponse>(
-        '/transcribe',
+        "/transcribe",
         formData,
         {
           headers: formData.getHeaders(),
-        }
+        },
       );
       return response.data;
     });
@@ -171,7 +182,9 @@ export class WhisperClient {
   /**
    * 複数セグメントをバッチ処理
    */
-  async transcribeBatch(requests: TranscribeRequest[]): Promise<TranscribeResponse[]> {
+  async transcribeBatch(
+    requests: TranscribeRequest[],
+  ): Promise<TranscribeResponse[]> {
     if (requests.length === 0) {
       return [];
     }
@@ -188,7 +201,7 @@ export class WhisperClient {
 
     // セルフホスト API の場合はバッチ処理
     if (!this.client) {
-      throw new Error('HTTP client not initialized');
+      throw new Error("HTTP client not initialized");
     }
 
     const formData = new FormData();
@@ -203,9 +216,9 @@ export class WhisperClient {
 
     // 複数の音声ファイルを追加
     requests.forEach((request, index) => {
-      formData.append('files', request.audioData, {
+      formData.append("files", request.audioData, {
         filename: `segment_${index}.${request.audioFormat}`,
-        contentType: `audio/${request.audioFormat === 'ogg' ? 'ogg' : 'wav'}`,
+        contentType: `audio/${request.audioFormat === "ogg" ? "ogg" : "wav"}`,
       });
 
       metadata.push({
@@ -214,17 +227,17 @@ export class WhisperClient {
         display_name: request.displayName,
         start_ts: request.startTs,
         end_ts: request.endTs,
-        language: request.language ?? 'ja',
+        language: request.language ?? "ja",
       });
     });
 
-    formData.append('metadata', JSON.stringify(metadata));
+    formData.append("metadata", JSON.stringify(metadata));
 
     return this.executeWithRetry(async () => {
       const response = await this.client!.post<{
         success: boolean;
         data: { results: TranscribeResponse[] };
-      }>('/transcribe/batch', formData, {
+      }>("/transcribe/batch", formData, {
         headers: formData.getHeaders(),
         timeout: this.config.timeout * requests.length,
       });
@@ -242,11 +255,11 @@ export class WhisperClient {
       this.isHealthy = health.isHealthy;
       this.lastHealthCheck = Date.now();
       return {
-        status: health.isHealthy ? 'healthy' : 'unhealthy',
+        status: health.isHealthy ? "healthy" : "unhealthy",
         model_loaded: true,
         model_name: (health.details?.model as string) ?? this.providerType,
-        device: 'cloud',
-        compute_type: 'api',
+        device: "cloud",
+        compute_type: "api",
         uptime_seconds: 0,
         requests_processed: 0,
         avg_processing_time_ms: 0,
@@ -255,14 +268,14 @@ export class WhisperClient {
 
     // セルフホスト API の場合
     if (!this.client) {
-      throw new Error('HTTP client not initialized');
+      throw new Error("HTTP client not initialized");
     }
 
     try {
-      const response = await this.client.get<HealthCheckResponse>('/health', {
+      const response = await this.client.get<HealthCheckResponse>("/health", {
         timeout: 5000,
       });
-      this.isHealthy = response.data.status === 'healthy';
+      this.isHealthy = response.data.status === "healthy";
       this.lastHealthCheck = Date.now();
       return response.data;
     } catch (error) {
@@ -287,7 +300,7 @@ export class WhisperClient {
 
         // リトライ不可のエラー
         if (this.isNonRetryableError(error)) {
-          logger.error('Non-retryable error:', error);
+          logger.error("Non-retryable error:", error);
           throw error;
         }
 
@@ -299,7 +312,7 @@ export class WhisperClient {
         // 待機してリトライ
         logger.warn(
           `Retry attempt ${attempt + 1}/${this.config.retryCount} after ${delay}ms`,
-          { error: (error as Error).message }
+          { error: (error as Error).message },
         );
         await this.sleep(delay);
         delay *= this.config.retryBackoffMultiplier;

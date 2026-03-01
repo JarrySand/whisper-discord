@@ -1,20 +1,20 @@
 /**
  * T-4: 全体遅延テスト
- * 
+ *
  * 目的: 3〜30秒以内で安定
- * 
+ *
  * テスト項目:
  * - 30秒以内に文字起こし完了
  * - 連続セグメントで安定した遅延
  * - サーキットブレーカー連携時のパフォーマンス
- * 
+ *
  * 注意: これらのテストは実際のWhisper APIを使用しないモックテストです。
  *       実際のAPIを使用したテストは手動で行う必要があります。
  */
-import { TranscriptionQueue } from '../../api/queue.js';
-import { CircuitBreaker } from '../../api/circuit-breaker.js';
-import type { WhisperClient } from '../../api/whisper-client.js';
-import type { AudioSegment, TranscribeResponse } from '../../types/index.js';
+import { TranscriptionQueue } from "../../api/queue.js";
+import { CircuitBreaker } from "../../api/circuit-breaker.js";
+import type { WhisperClient } from "../../api/whisper-client.js";
+import type { AudioSegment, TranscribeResponse } from "../../types/index.js";
 
 /**
  * モックのAudioSegmentを作成
@@ -23,14 +23,14 @@ function createMockSegment(duration = 3000): AudioSegment {
   const now = Date.now();
   return {
     id: `seg-${Math.random().toString(36).slice(2, 10)}`,
-    userId: 'user-1',
-    username: 'testuser',
-    displayName: 'Test User',
+    userId: "user-1",
+    username: "testuser",
+    displayName: "Test User",
     startTimestamp: now - duration,
     endTimestamp: now,
     duration,
-    audioData: Buffer.from('mock-audio'),
-    audioFormat: 'ogg',
+    audioData: Buffer.from("mock-audio"),
+    audioFormat: "ogg",
     sampleRate: 16000,
     channels: 1,
     bitrate: 32000,
@@ -40,34 +40,36 @@ function createMockSegment(duration = 3000): AudioSegment {
 /**
  * 遅延をシミュレートするWhisperClientモック
  */
-function createTimedMockWhisperClient(processingDelayMs: number): jest.Mocked<WhisperClient> {
+function createTimedMockWhisperClient(
+  processingDelayMs: number,
+): jest.Mocked<WhisperClient> {
   return {
     transcribe: jest.fn().mockImplementation(async () => {
       await new Promise((r) => setTimeout(r, processingDelayMs));
       return {
         success: true,
         data: {
-          user_id: 'user-1',
-          username: 'testuser',
-          display_name: 'Test User',
-          text: 'これはテストメッセージです。',
+          user_id: "user-1",
+          username: "testuser",
+          display_name: "Test User",
+          text: "これはテストメッセージです。",
           start_ts: Date.now() - 3000,
           end_ts: Date.now(),
           duration_ms: 3000,
-          language: 'ja',
+          language: "ja",
           confidence: 0.95,
           processing_time_ms: processingDelayMs,
         },
       } as TranscribeResponse;
     }),
     healthCheck: jest.fn(),
-    getBaseUrl: jest.fn().mockReturnValue('http://localhost:8000'),
+    getBaseUrl: jest.fn().mockReturnValue("http://localhost:8000"),
   } as unknown as jest.Mocked<WhisperClient>;
 }
 
-describe('T-4: 全体遅延テスト', () => {
-  describe('30秒以内に完了', () => {
-    test('シミュレートされたAPI遅延で30秒以内に完了', async () => {
+describe("T-4: 全体遅延テスト", () => {
+  describe("30秒以内に完了", () => {
+    test("シミュレートされたAPI遅延で30秒以内に完了", async () => {
       // 5秒の処理遅延をシミュレート
       const mockClient = createTimedMockWhisperClient(5000);
       const queue = new TranscriptionQueue(mockClient);
@@ -75,19 +77,24 @@ describe('T-4: 全体遅延テスト', () => {
       const segment = createMockSegment(5000);
       const startTime = Date.now();
 
-      const resultPromise = new Promise<TranscribeResponse>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout after 30 seconds')), 30000);
+      const resultPromise = new Promise<TranscribeResponse>(
+        (resolve, reject) => {
+          const timeout = setTimeout(
+            () => reject(new Error("Timeout after 30 seconds")),
+            30000,
+          );
 
-        queue.on('completed', (_item, result: TranscribeResponse) => {
-          clearTimeout(timeout);
-          resolve(result);
-        });
+          queue.on("completed", (_item, result: TranscribeResponse) => {
+            clearTimeout(timeout);
+            resolve(result);
+          });
 
-        queue.on('failed', (_item, error) => {
-          clearTimeout(timeout);
-          reject(error);
-        });
-      });
+          queue.on("failed", (_item, error) => {
+            clearTimeout(timeout);
+            reject(error);
+          });
+        },
+      );
 
       queue.start();
       queue.enqueue(segment);
@@ -105,8 +112,8 @@ describe('T-4: 全体遅延テスト', () => {
     });
   });
 
-  describe('連続セグメントの安定性', () => {
-    test('連続10セグメントで安定した遅延', async () => {
+  describe("連続セグメントの安定性", () => {
+    test("連続10セグメントで安定した遅延", async () => {
       // 1秒の処理遅延をシミュレート
       const mockClient = createTimedMockWhisperClient(1000);
       const queue = new TranscriptionQueue(mockClient, { concurrency: 2 });
@@ -116,9 +123,9 @@ describe('T-4: 全体遅延テスト', () => {
       const totalSegments = 10;
 
       const allCompletedPromise = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout')), 60000);
+        const timeout = setTimeout(() => reject(new Error("Timeout")), 60000);
 
-        queue.on('completed', () => {
+        queue.on("completed", () => {
           completedCount++;
           if (completedCount >= totalSegments) {
             clearTimeout(timeout);
@@ -134,7 +141,7 @@ describe('T-4: 全体遅延テスト', () => {
         const segment = createMockSegment(3000);
         const startTime = Date.now();
 
-        queue.once('completed', () => {
+        queue.once("completed", () => {
           latencies.push(Date.now() - startTime);
         });
 
@@ -143,14 +150,15 @@ describe('T-4: 全体遅延テスト', () => {
 
       await allCompletedPromise;
 
-      const avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+      const avgLatency =
+        latencies.reduce((a, b) => a + b, 0) / latencies.length;
       const maxLatency = Math.max(...latencies);
       const minLatency = Math.min(...latencies);
 
       expect(avgLatency).toBeLessThan(15000);
       expect(maxLatency).toBeLessThan(30000);
 
-      console.log('遅延統計:');
+      console.log("遅延統計:");
       console.log(`  平均: ${Math.round(avgLatency)}ms`);
       console.log(`  最大: ${maxLatency}ms`);
       console.log(`  最小: ${minLatency}ms`);
@@ -159,21 +167,28 @@ describe('T-4: 全体遅延テスト', () => {
       queue.stop();
     });
 
-    test('並行処理で高速化される', async () => {
+    test("並行処理で高速化される", async () => {
       const mockClient = createTimedMockWhisperClient(500);
 
       // concurrency=1の場合
-      const queueSerial = new TranscriptionQueue(mockClient, { concurrency: 1 });
+      const queueSerial = new TranscriptionQueue(mockClient, {
+        concurrency: 1,
+      });
 
       // concurrency=4の場合
-      const queueParallel = new TranscriptionQueue(mockClient, { concurrency: 4 });
+      const queueParallel = new TranscriptionQueue(mockClient, {
+        concurrency: 4,
+      });
 
-      const measureTime = async (queue: TranscriptionQueue, count: number): Promise<number> => {
+      const measureTime = async (
+        queue: TranscriptionQueue,
+        count: number,
+      ): Promise<number> => {
         let completed = 0;
         const startTime = Date.now();
 
         const donePromise = new Promise<number>((resolve) => {
-          queue.on('completed', () => {
+          queue.on("completed", () => {
             completed++;
             if (completed >= count) {
               resolve(Date.now() - startTime);
@@ -203,8 +218,8 @@ describe('T-4: 全体遅延テスト', () => {
     });
   });
 
-  describe('サーキットブレーカー連携', () => {
-    test('サーキットブレーカーがオーバーヘッドを最小化', async () => {
+  describe("サーキットブレーカー連携", () => {
+    test("サーキットブレーカーがオーバーヘッドを最小化", async () => {
       const mockClient = createTimedMockWhisperClient(100);
       const circuitBreaker = new CircuitBreaker();
       const queue = new TranscriptionQueue(mockClient, {}, circuitBreaker);
@@ -213,7 +228,7 @@ describe('T-4: 全体遅延テスト', () => {
       let completed = false;
 
       const donePromise = new Promise<void>((resolve) => {
-        queue.on('completed', () => {
+        queue.on("completed", () => {
           completed = true;
           resolve();
         });
@@ -237,8 +252,8 @@ describe('T-4: 全体遅延テスト', () => {
     });
   });
 
-  describe('パフォーマンスメトリクス', () => {
-    test('処理時間の統計を収集できる', async () => {
+  describe("パフォーマンスメトリクス", () => {
+    test("処理時間の統計を収集できる", async () => {
       const processingTimes = [100, 200, 150, 180, 120];
       let callIndex = 0;
 
@@ -250,27 +265,27 @@ describe('T-4: 全体遅延テスト', () => {
           return {
             success: true,
             data: {
-              user_id: 'user-1',
-              username: 'testuser',
-              display_name: 'Test User',
-              text: 'テスト',
+              user_id: "user-1",
+              username: "testuser",
+              display_name: "Test User",
+              text: "テスト",
               start_ts: Date.now() - 3000,
               end_ts: Date.now(),
               duration_ms: 3000,
-              language: 'ja',
+              language: "ja",
               confidence: 0.95,
               processing_time_ms: delay,
             },
           } as TranscribeResponse;
         }),
         healthCheck: jest.fn(),
-        getBaseUrl: jest.fn().mockReturnValue('http://localhost:8000'),
+        getBaseUrl: jest.fn().mockReturnValue("http://localhost:8000"),
       } as unknown as jest.Mocked<WhisperClient>;
 
       const queue = new TranscriptionQueue(variableClient, { concurrency: 1 });
       const recordedTimes: number[] = [];
 
-      queue.on('completed', (_item, result: TranscribeResponse) => {
+      queue.on("completed", (_item, result: TranscribeResponse) => {
         if (result.data?.processing_time_ms) {
           recordedTimes.push(result.data.processing_time_ms);
         }
@@ -278,7 +293,7 @@ describe('T-4: 全体遅延テスト', () => {
 
       let completed = 0;
       const donePromise = new Promise<void>((resolve) => {
-        queue.on('completed', () => {
+        queue.on("completed", () => {
           completed++;
           if (completed >= processingTimes.length) {
             resolve();
@@ -294,11 +309,12 @@ describe('T-4: 全体遅延テスト', () => {
 
       await donePromise;
 
-      const avg = recordedTimes.reduce((a, b) => a + b, 0) / recordedTimes.length;
+      const avg =
+        recordedTimes.reduce((a, b) => a + b, 0) / recordedTimes.length;
       const max = Math.max(...recordedTimes);
       const min = Math.min(...recordedTimes);
 
-      console.log('処理時間メトリクス:');
+      console.log("処理時間メトリクス:");
       console.log(`  サンプル数: ${recordedTimes.length}`);
       console.log(`  平均: ${avg.toFixed(2)}ms`);
       console.log(`  最大: ${max}ms`);
@@ -310,4 +326,3 @@ describe('T-4: 全体遅延テスト', () => {
     });
   });
 });
-

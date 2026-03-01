@@ -4,23 +4,23 @@
  * - AI解析やデータ処理に適した構造化データ
  * - 参加者情報と統計情報を自動計算
  */
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { randomUUID } from 'crypto';
-import { logger } from '../utils/logger.js';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { randomUUID } from "crypto";
+import { logger } from "../utils/logger.js";
 import type {
   TranscriptionResult,
   JsonStoreConfig,
   TranscriptionSessionJson,
   TranscriptionSegmentJson,
   SessionStatsJson,
-} from '../types/index.js';
+} from "../types/index.js";
 
 /**
  * デフォルト設定
  */
 const defaultConfig: JsonStoreConfig = {
-  baseDir: './logs',
+  baseDir: "./logs",
   saveIntervalMs: 10000,
   prettyPrint: true,
 };
@@ -36,7 +36,7 @@ export class JsonStoreService {
 
   constructor(config: Partial<JsonStoreConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
-    logger.debug('JsonStoreService initialized', { config: this.config });
+    logger.debug("JsonStoreService initialized", { config: this.config });
   }
 
   /**
@@ -46,20 +46,20 @@ export class JsonStoreService {
     guildId: string,
     guildName: string,
     channelId: string,
-    channelName: string
+    channelName: string,
   ): Promise<void> {
     const now = new Date();
     const sessionId = this.generateSessionId();
 
     this.session = {
-      version: '1.0.0',
+      version: "1.0.0",
       session_id: sessionId,
       guild_id: guildId,
       guild_name: guildName,
       channel_id: channelId,
       channel_name: channelName,
       session_start: now.toISOString(),
-      session_end: '',
+      session_end: "",
       duration_ms: 0,
       participants: [],
       segments: [],
@@ -67,10 +67,13 @@ export class JsonStoreService {
     };
 
     // ファイルパス設定
-    const dateDir = path.join(this.config.baseDir, now.toISOString().split('T')[0]);
+    const dateDir = path.join(
+      this.config.baseDir,
+      now.toISOString().split("T")[0],
+    );
     await fs.mkdir(dateDir, { recursive: true });
 
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-');
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "-");
     this.jsonPath = path.join(dateDir, `${sessionId}-${timeStr}.json`);
 
     // 初期保存
@@ -79,7 +82,10 @@ export class JsonStoreService {
     // 定期保存開始
     this.startSaveTimer();
 
-    logger.info('JsonStoreService session started', { sessionId, jsonPath: this.jsonPath });
+    logger.info("JsonStoreService session started", {
+      sessionId,
+      jsonPath: this.jsonPath,
+    });
   }
 
   /**
@@ -87,7 +93,7 @@ export class JsonStoreService {
    */
   async addSegment(result: TranscriptionResult): Promise<void> {
     if (!this.session) {
-      logger.warn('No active session for JSON store');
+      logger.warn("No active session for JSON store");
       return;
     }
 
@@ -102,7 +108,7 @@ export class JsonStoreService {
       end_ts: result.endTs,
       duration_ms: result.durationMs,
       confidence: result.confidence,
-      language: result.language || 'ja',
+      language: result.language || "ja",
     };
 
     this.session.segments.push(segment);
@@ -134,7 +140,7 @@ export class JsonStoreService {
     // 保存
     await this.save();
 
-    logger.info('JsonStoreService session ended', {
+    logger.info("JsonStoreService session ended", {
       sessionId: this.session.session_id,
       segments: this.session.segments.length,
     });
@@ -148,7 +154,7 @@ export class JsonStoreService {
    */
   private updateParticipant(result: TranscriptionResult): void {
     let participant = this.session!.participants.find(
-      (p) => p.user_id === result.userId
+      (p) => p.user_id === result.userId,
     );
 
     if (!participant) {
@@ -197,7 +203,7 @@ export class JsonStoreService {
     // WPM計算（日本語は文字数ベース）
     const totalChars = this.session!.segments.reduce(
       (sum, s) => sum + s.text.length,
-      0
+      0,
     );
     const durationMinutes = this.session!.duration_ms / 60000;
     stats.words_per_minute =
@@ -215,9 +221,9 @@ export class JsonStoreService {
         ? JSON.stringify(this.session, null, 2)
         : JSON.stringify(this.session);
 
-      await fs.writeFile(this.jsonPath, content, 'utf-8');
+      await fs.writeFile(this.jsonPath, content, "utf-8");
     } catch (error) {
-      logger.error('Failed to save JSON store', { error });
+      logger.error("Failed to save JSON store", { error });
     }
   }
 
@@ -275,4 +281,3 @@ export class JsonStoreService {
 }
 
 export default JsonStoreService;
-

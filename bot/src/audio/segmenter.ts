@@ -1,12 +1,16 @@
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs/promises';
-import path from 'path';
-import type { UserAudioBuffer, AudioSegment, SegmenterConfig } from '../types/index.js';
-import { AudioEncoder } from './encoder.js';
-import { Resampler } from './resampler.js';
-import { logger } from '../utils/logger.js';
-import { botConfig } from '../config/index.js';
-import { getISODateString, getISOTimeString } from '../utils/time.js';
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs/promises";
+import path from "path";
+import type {
+  UserAudioBuffer,
+  AudioSegment,
+  SegmenterConfig,
+} from "../types/index.js";
+import { AudioEncoder } from "./encoder.js";
+import { Resampler } from "./resampler.js";
+import { logger } from "../utils/logger.js";
+import { botConfig } from "../config/index.js";
+import { getISODateString, getISOTimeString } from "../utils/time.js";
 
 /**
  * 音声セグメンター
@@ -30,7 +34,8 @@ export class AudioSegmenter {
     this.config = {
       minDuration: config?.minDuration ?? botConfig.audio.minSegmentDuration,
       maxDuration: config?.maxDuration ?? botConfig.audio.maxSegmentDuration,
-      minRmsThreshold: config?.minRmsThreshold ?? botConfig.audio.minRmsThreshold,
+      minRmsThreshold:
+        config?.minRmsThreshold ?? botConfig.audio.minRmsThreshold,
       saveToFile: config?.saveToFile ?? false,
       segmentDir: config?.segmentDir ?? botConfig.output.segmentDir,
     };
@@ -41,7 +46,7 @@ export class AudioSegmenter {
    * 音声エネルギーレベルを測定し、無音/低エネルギーを検出
    */
   private calculateRMS(pcmData: Buffer): number {
-    const samples = pcmData.length / 2;  // 16-bit = 2 bytes per sample
+    const samples = pcmData.length / 2; // 16-bit = 2 bytes per sample
     if (samples === 0) return 0;
 
     let sumSquares = 0;
@@ -65,7 +70,7 @@ export class AudioSegmenter {
     if (duration < this.config.minDuration) {
       this.stats.discardedTooShort++;
       logger.debug(
-        `Segment too short (${duration}ms < ${this.config.minDuration}ms), discarding`
+        `Segment too short (${duration}ms < ${this.config.minDuration}ms), discarding`,
       );
       return null;
     }
@@ -80,7 +85,7 @@ export class AudioSegmenter {
     if (rms < this.config.minRmsThreshold) {
       this.stats.discardedLowEnergy++;
       logger.debug(
-        `Segment too quiet (RMS=${rms.toFixed(4)} < ${this.config.minRmsThreshold}), discarding [cost saving]`
+        `Segment too quiet (RMS=${rms.toFixed(4)} < ${this.config.minRmsThreshold}), discarding [cost saving]`,
       );
       return null;
     }
@@ -92,24 +97,26 @@ export class AudioSegmenter {
 
     // OGGにエンコード（失敗時はWAV）
     let audioData: Buffer;
-    let audioFormat: 'ogg' | 'wav';
+    let audioFormat: "ogg" | "wav";
 
     try {
       audioData = await this.encoder.encodeToOgg(resampledData);
-      audioFormat = 'ogg';
+      audioFormat = "ogg";
     } catch (error) {
-      logger.warn('OGG encoding failed, falling back to WAV:', error);
+      logger.warn("OGG encoding failed, falling back to WAV:", error);
       audioData = this.encoder.encodeToWav(resampledData);
-      audioFormat = 'wav';
+      audioFormat = "wav";
     }
 
     // タイムスタンプがnullの場合は現在時刻からdurationを引いた値を使用
     const endTimestamp = buffer.lastActivityTimestamp;
-    const startTimestamp = buffer.startTimestamp ?? (endTimestamp - duration);
-    
+    const startTimestamp = buffer.startTimestamp ?? endTimestamp - duration;
+
     // タイムスタンプの妥当性チェック（1970年より前やnullはありえない）
     if (startTimestamp <= 0 || !Number.isFinite(startTimestamp)) {
-      logger.warn(`Invalid startTimestamp detected: ${startTimestamp}, using current time`);
+      logger.warn(
+        `Invalid startTimestamp detected: ${startTimestamp}, using current time`,
+      );
     }
 
     const segment: AudioSegment = {
@@ -117,7 +124,8 @@ export class AudioSegmenter {
       userId: buffer.userId,
       username: buffer.username,
       displayName: buffer.displayName,
-      startTimestamp: startTimestamp > 0 ? startTimestamp : Date.now() - duration,
+      startTimestamp:
+        startTimestamp > 0 ? startTimestamp : Date.now() - duration,
       endTimestamp,
       duration,
       audioData,
@@ -192,10 +200,12 @@ export class AudioSegmenter {
     savedApiCalls: number;
     savingsRate: string;
   } {
-    const savedApiCalls = this.stats.discardedTooShort + this.stats.discardedLowEnergy;
-    const savingsRate = this.stats.totalSegments > 0
-      ? ((savedApiCalls / this.stats.totalSegments) * 100).toFixed(1)
-      : '0.0';
+    const savedApiCalls =
+      this.stats.discardedTooShort + this.stats.discardedLowEnergy;
+    const savingsRate =
+      this.stats.totalSegments > 0
+        ? ((savedApiCalls / this.stats.totalSegments) * 100).toFixed(1)
+        : "0.0";
 
     return {
       ...this.stats,
@@ -216,4 +226,3 @@ export class AudioSegmenter {
     };
   }
 }
-

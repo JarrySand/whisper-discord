@@ -1,7 +1,7 @@
-import type { UserAudioBuffer, AudioSegment } from '../types/index.js';
-import { AudioSegmenter } from './segmenter.js';
-import { logger } from '../utils/logger.js';
-import { botConfig } from '../config/index.js';
+import type { UserAudioBuffer, AudioSegment } from "../types/index.js";
+import { AudioSegmenter } from "./segmenter.js";
+import { logger } from "../utils/logger.js";
+import { botConfig } from "../config/index.js";
 
 /**
  * ユーザー別音声バッファ管理
@@ -11,7 +11,7 @@ export class AudioBufferManager {
   private segmenter: AudioSegmenter;
   private readonly maxBufferDuration: number;
   private readonly silenceThreshold: number;
-  
+
   // フラッシュ中フラグ（重複フラッシュ防止）
   private flushingUsers = new Set<string>();
 
@@ -38,7 +38,7 @@ export class AudioBufferManager {
     userId: string,
     username: string,
     displayName: string,
-    data: Buffer
+    data: Buffer,
   ): void {
     const buffer = this.getOrCreateBuffer(userId, username, displayName);
     const now = Date.now();
@@ -51,7 +51,10 @@ export class AudioBufferManager {
     buffer.lastActivityTimestamp = now;
 
     // 最大長に達したら強制セグメント化（フラッシュ中でなければ）
-    if (!this.flushingUsers.has(userId) && this.getBufferDuration(buffer) >= this.maxBufferDuration) {
+    if (
+      !this.flushingUsers.has(userId) &&
+      this.getBufferDuration(buffer) >= this.maxBufferDuration
+    ) {
       void this.flushBuffer(userId);
     }
   }
@@ -62,7 +65,7 @@ export class AudioBufferManager {
   private getOrCreateBuffer(
     userId: string,
     username: string,
-    displayName: string
+    displayName: string,
   ): UserAudioBuffer {
     let buffer = this.buffers.get(userId);
     if (!buffer) {
@@ -108,7 +111,7 @@ export class AudioBufferManager {
     if (this.flushingUsers.has(userId)) {
       return;
     }
-    
+
     const buffer = this.buffers.get(userId);
     if (!buffer || buffer.chunks.length === 0) return;
 
@@ -121,7 +124,7 @@ export class AudioBufferManager {
 
       if (segment) {
         logger.info(
-          `Created segment: ${segment.id} for user ${segment.displayName} (${segment.duration}ms)`
+          `Created segment: ${segment.id} for user ${segment.displayName} (${segment.duration}ms)`,
         );
 
         // コールバックを呼び出し
@@ -185,4 +188,3 @@ export class AudioBufferManager {
     return buffer.chunks.reduce((sum, chunk) => sum + chunk.data.length, 0);
   }
 }
-

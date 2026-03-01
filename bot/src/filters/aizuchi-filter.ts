@@ -4,7 +4,7 @@
  * VC会話では「うん」「はい」「なるほど」などの相槌が大量に発生する。
  * これらは議事録としてはノイズとなるため、文字起こし結果から除去する。
  */
-import { logger } from '../utils/logger.js';
+import { logger } from "../utils/logger.js";
 
 export interface AizuchiFilterConfig {
   enabled: boolean;
@@ -76,7 +76,7 @@ export class AizuchiFilter {
 
     logger.debug(
       `AizuchiFilter initialized: enabled=${this.enabled}, ` +
-        `patterns=${this.patterns.length}, maxLength=${this.maxLength}`
+        `patterns=${this.patterns.length}, maxLength=${this.maxLength}`,
     );
   }
 
@@ -154,4 +154,3 @@ export class AizuchiFilter {
     this.filteredCount = 0;
   }
 }
-

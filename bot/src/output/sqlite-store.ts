@@ -3,11 +3,11 @@
  * - 文字起こし結果をSQLiteに保存
  * - /search コマンドで検索可能
  */
-import Database from 'better-sqlite3';
-import * as fs from 'fs';
-import * as path from 'path';
-import { logger } from '../utils/logger.js';
-import type { TranscriptionResult } from '../types/index.js';
+import Database from "better-sqlite3";
+import * as fs from "fs";
+import * as path from "path";
+import { logger } from "../utils/logger.js";
+import type { TranscriptionResult } from "../types/index.js";
 
 /**
  * セッションデータ
@@ -84,8 +84,7 @@ export class SqliteStore {
   private db: Database.Database;
   private currentSessionId: string | null = null;
 
-  constructor(dbPath: string = './data/transcripts.db') {
-
+  constructor(dbPath: string = "./data/transcripts.db") {
     // Create directory if it doesn't exist
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
@@ -96,7 +95,7 @@ export class SqliteStore {
     this.db = new Database(dbPath);
     this.initialize();
 
-    logger.info('SqliteStore initialized', { dbPath });
+    logger.info("SqliteStore initialized", { dbPath });
   }
 
   /**
@@ -136,7 +135,7 @@ export class SqliteStore {
       CREATE INDEX IF NOT EXISTS idx_sessions_guild ON sessions(guild_id);
     `);
 
-    logger.debug('SqliteStore tables initialized');
+    logger.debug("SqliteStore tables initialized");
   }
 
   /**
@@ -154,11 +153,11 @@ export class SqliteStore {
       session.guildName,
       session.channelId,
       session.channelName || null,
-      session.startedAt.toISOString()
+      session.startedAt.toISOString(),
     );
 
     this.currentSessionId = session.id;
-    logger.debug('Session started in SQLite', { sessionId: session.id });
+    logger.debug("Session started in SQLite", { sessionId: session.id });
   }
 
   /**
@@ -166,7 +165,7 @@ export class SqliteStore {
    */
   endSession(participantCount: number = 0): void {
     if (!this.currentSessionId) {
-      logger.warn('No active session to end');
+      logger.warn("No active session to end");
       return;
     }
 
@@ -177,7 +176,9 @@ export class SqliteStore {
     `);
 
     stmt.run(new Date().toISOString(), participantCount, this.currentSessionId);
-    logger.debug('Session ended in SQLite', { sessionId: this.currentSessionId });
+    logger.debug("Session ended in SQLite", {
+      sessionId: this.currentSessionId,
+    });
     this.currentSessionId = null;
   }
 
@@ -200,10 +201,10 @@ export class SqliteStore {
       utterance.text,
       utterance.startTs,
       utterance.endTs,
-      utterance.confidence ?? null
+      utterance.confidence ?? null,
     );
 
-    logger.debug('Utterance saved', { segmentId: utterance.segmentId });
+    logger.debug("Utterance saved", { segmentId: utterance.segmentId });
   }
 
   /**
@@ -211,7 +212,7 @@ export class SqliteStore {
    */
   saveTranscriptionResult(result: TranscriptionResult): void {
     if (!this.currentSessionId) {
-      logger.warn('No active session, cannot save transcription result');
+      logger.warn("No active session, cannot save transcription result");
       return;
     }
 
@@ -331,23 +332,29 @@ export class SqliteStore {
     totalUtterances: number;
     totalParticipants: number;
   } {
-    let sessionSql = 'SELECT COUNT(*) as count FROM sessions';
-    let utteranceSql = 'SELECT COUNT(*) as count FROM utterances';
-    let participantSql =
-      'SELECT SUM(participant_count) as count FROM sessions';
+    let sessionSql = "SELECT COUNT(*) as count FROM sessions";
+    let utteranceSql = "SELECT COUNT(*) as count FROM utterances";
+    let participantSql = "SELECT SUM(participant_count) as count FROM sessions";
 
     const params: string[] = [];
 
     if (guildId) {
-      sessionSql += ' WHERE guild_id = ?';
-      utteranceSql += ' WHERE session_id IN (SELECT id FROM sessions WHERE guild_id = ?)';
-      participantSql += ' WHERE guild_id = ?';
+      sessionSql += " WHERE guild_id = ?";
+      utteranceSql +=
+        " WHERE session_id IN (SELECT id FROM sessions WHERE guild_id = ?)";
+      participantSql += " WHERE guild_id = ?";
       params.push(guildId);
     }
 
-    const sessions = this.db.prepare(sessionSql).get(...params) as { count: number };
-    const utterances = this.db.prepare(utteranceSql).get(...params) as { count: number };
-    const participants = this.db.prepare(participantSql).get(...params) as { count: number | null };
+    const sessions = this.db.prepare(sessionSql).get(...params) as {
+      count: number;
+    };
+    const utterances = this.db.prepare(utteranceSql).get(...params) as {
+      count: number;
+    };
+    const participants = this.db.prepare(participantSql).get(...params) as {
+      count: number | null;
+    };
 
     return {
       totalSessions: sessions.count,
@@ -397,7 +404,7 @@ export class SqliteStore {
    */
   close(): void {
     this.db.close();
-    logger.debug('SqliteStore closed');
+    logger.debug("SqliteStore closed");
   }
 }
 
@@ -411,7 +418,7 @@ export class SqliteStoreManager {
   private baseDir: string;
   private cleanupDays: number;
 
-  constructor(baseDir: string = './data', cleanupDays: number = 30) {
+  constructor(baseDir: string = "./data", cleanupDays: number = 30) {
     this.baseDir = baseDir;
     this.cleanupDays = cleanupDays;
 
@@ -420,7 +427,7 @@ export class SqliteStoreManager {
       fs.mkdirSync(baseDir, { recursive: true });
     }
 
-    logger.info('SqliteStoreManager initialized', { baseDir });
+    logger.info("SqliteStoreManager initialized", { baseDir });
   }
 
   /**
@@ -439,7 +446,7 @@ export class SqliteStoreManager {
       const dbPath = this.getDbPath(guildId);
       store = new SqliteStore(dbPath);
       this.stores.set(guildId, store);
-      logger.debug('Created new SqliteStore for guild', { guildId, dbPath });
+      logger.debug("Created new SqliteStore for guild", { guildId, dbPath });
     }
     return store;
   }
@@ -464,13 +471,13 @@ export class SqliteStoreManager {
     for (const [guildId, store] of this.stores) {
       try {
         store.close();
-        logger.debug('Closed SqliteStore for guild', { guildId });
+        logger.debug("Closed SqliteStore for guild", { guildId });
       } catch (error) {
-        logger.error('Failed to close SqliteStore', { guildId, error });
+        logger.error("Failed to close SqliteStore", { guildId, error });
       }
     }
     this.stores.clear();
-    logger.info('All SqliteStores closed');
+    logger.info("All SqliteStores closed");
   }
 
   /**
@@ -483,10 +490,10 @@ export class SqliteStoreManager {
         const cleaned = store.cleanupOldSessions(this.cleanupDays);
         totalCleaned += cleaned;
         if (cleaned > 0) {
-          logger.debug('Cleaned up sessions', { guildId, cleaned });
+          logger.debug("Cleaned up sessions", { guildId, cleaned });
         }
       } catch (error) {
-        logger.error('Failed to cleanup store', { guildId, error });
+        logger.error("Failed to cleanup store", { guildId, error });
       }
     }
     return totalCleaned;
@@ -499,8 +506,8 @@ export class SqliteStoreManager {
     try {
       const files = fs.readdirSync(this.baseDir);
       return files
-        .filter(f => f.startsWith('guild_') && f.endsWith('.db'))
-        .map(f => f.replace('guild_', '').replace('.db', ''));
+        .filter((f) => f.startsWith("guild_") && f.endsWith(".db"))
+        .map((f) => f.replace("guild_", "").replace(".db", ""));
     } catch {
       return [];
     }
@@ -508,4 +515,3 @@ export class SqliteStoreManager {
 }
 
 export default SqliteStore;
-
